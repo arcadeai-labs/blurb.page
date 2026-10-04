@@ -1,12 +1,7 @@
 import { createRunner, RunError } from 'run'
 import { z } from 'zod'
 
-import {
-  calledToolNames,
-  type McpConnection,
-  mcpHostFunctions,
-  withMcpClient,
-} from './mcp'
+import { type McpConnection, mcpHostFunctions, withMcpClient } from './mcp'
 import { authorizationRequired, type ScriptError } from './script-error'
 
 const runner = createRunner({ limits: { timeoutMs: 60_000 } })
@@ -48,13 +43,9 @@ export async function executeScript(
       const result = await runner.run({
         source,
         hostFunctions: {
-          tools: await mcpHostFunctions(
-            client,
-            calledToolNames(script.source),
-            (toolName, url) => {
-              authorization ??= { toolName, url }
-            },
-          ),
+          tools: await mcpHostFunctions(client, (toolName, url) => {
+            authorization ??= { toolName, url }
+          }),
         },
         abortSignal,
       })

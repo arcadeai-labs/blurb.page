@@ -240,7 +240,7 @@ function createMcpServer(
     'list_script_tools',
     {
       description:
-        "List the tools on the user's MCP gateway that scripts can call as `tools.<functionName>(args)`. A gateway in discovery mode lists only Arcade's meta-tools (Arcade_SelectTools, Arcade_UseTool); scripts can still call any tool Arcade_SelectTools finds directly, as `tools.<Toolkit>_<Tool>(inputs)` (e.g. `tools.Gmail_ListEmails({ n_emails: 5 })`), and it runs through Arcade_UseTool.",
+        "List the tools on the user's MCP gateway that scripts can call as `tools.<functionName>(args)`",
       annotations: { readOnlyHint: true },
     },
     () =>
