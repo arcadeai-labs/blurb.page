@@ -1,22 +1,14 @@
+import { useQueryClient } from '@tanstack/react-query'
 import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { TableKit } from '@tiptap/extension-table'
 import { Placeholder } from '@tiptap/extensions'
 import { Markdown } from '@tiptap/markdown'
 import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import { useState } from 'react'
+import { listApps } from '@/lib/mcp'
 import { SlashCommands } from './slash-menu'
 import { UiBlock } from './ui-block'
-
-const extensions = [
-  StarterKit.configure({ link: { openOnClick: false } }),
-  TaskList,
-  TaskItem.configure({ nested: true }),
-  TableKit,
-  Placeholder.configure({ placeholder: 'Write, or type / for blocks' }),
-  Markdown,
-  UiBlock,
-  SlashCommands,
-]
 
 /**
  * A Notion-like editor for a doc's Markdown. ```ui code blocks render as live
@@ -29,6 +21,27 @@ export function DocEditor({
   body: string
   onChange: (body: string) => void
 }) {
+  const queryClient = useQueryClient()
+  const [extensions] = useState(() => [
+    StarterKit.configure({ link: { openOnClick: false } }),
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    TableKit,
+    Placeholder.configure({ placeholder: 'Write, or type / for blocks' }),
+    Markdown,
+    UiBlock,
+    SlashCommands.configure({
+      // Shares the apps list's cache, so typing doesn't refetch every key.
+      apps: async () => {
+        const { apps } = await queryClient.fetchQuery({
+          queryKey: ['apps'],
+          queryFn: listApps,
+          staleTime: 30_000,
+        })
+        return apps
+      },
+    }),
+  ])
   const editor = useEditor({
     extensions,
     content: body,

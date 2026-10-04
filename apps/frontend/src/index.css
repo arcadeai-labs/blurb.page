@@ -153,6 +153,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  /* Heights pass down from here, so pages can fill what's under the navbar. */
+  html,
+  body {
+    @apply h-full;
+  }
   body {
     @apply bg-background text-foreground;
   }
@@ -202,6 +207,22 @@
     --ring: oklch(0.708 0 0);
     --line: var(--surface-line);
   }
+}
+
+/*
+ * Elements that fill their parent ([data-fill]: a ScrollArea without a height,
+ * Slides) take the space it has left. The containers between them and the
+ * app's root ([data-fill-root]) pass that space down: in a column they grow,
+ * in a row they stretch, and grid cells stretch already. Nothing here depends
+ * on the window: an app fills whatever it is mounted in.
+ */
+:where([data-fill-root], [data-fill-root] :is(.flex-col, [data-slot="tabs"]))
+  > :is([data-fill], :has([data-fill])) {
+  flex: 1 1 0%;
+}
+
+[data-fill-root] .flex-row > :is([data-fill], :has([data-fill])) {
+  align-self: stretch;
 }
 
 /* The doc editor (Tiptap): what the typography plugin doesn't cover. */

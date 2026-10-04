@@ -1,4 +1,5 @@
 import { Link } from '@tanstack/react-router'
+import { cn } from 'cn'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
@@ -6,15 +7,18 @@ import { Skeleton } from '@/components/ui/skeleton'
 
 /**
  * A page under the navbar, which shows its title and description. Without a
- * title (e.g. while it loads) the navbar shows a skeleton instead.
+ * title (e.g. while it loads) the navbar shows a skeleton instead. A `fill`
+ * page stretches its content to the bottom of the page, for apps.
  */
 export function Page({
   title,
   description,
+  fill = false,
   children,
 }: Readonly<{
   title?: string
   description?: ReactNode
+  fill?: boolean
   children: ReactNode
 }>) {
   return (
@@ -65,7 +69,12 @@ export function Page({
         </div>
         <Separator />
       </header>
-      <main className="mx-auto grid max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:py-10">
+      <main
+        className={cn(
+          'mx-auto w-full max-w-6xl gap-6 px-4 py-8 sm:px-6 lg:py-10',
+          fill ? 'flex flex-1 flex-col' : 'grid',
+        )}
+      >
         {children}
       </main>
     </>

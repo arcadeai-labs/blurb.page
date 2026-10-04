@@ -184,5 +184,13 @@ Open issues by label:
 ```
 ````
 
-Saving validates every `ui` block like an app spec, including that the scripts
-it runs exist.
+A `ui` block can also mount a saved app by name, `{ "app": "issue-tracker" }`,
+which shows the app as it is now (type `/` and pick it under Apps). Saving
+validates every `ui` block like an app spec, including that the scripts it runs
+exist, and that mounted apps exist.
+
+Apps fill whatever they're shown in: a ScrollArea without a height and Slides
+take the space their parent has left, and the containers around them stretch to
+pass it down (`[data-fill]` in `index.css`). Nothing measures the window. On an
+app's page that's the area under the navbar; in a doc, a block holding one is
+600px tall unless it sets `"height"`.

@@ -16,23 +16,20 @@ import {
 } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
-import { type PropsOf, useFillHeight } from './components'
+import type { PropsOf } from './components'
 
 // Slides are laid out on a fixed canvas and scaled to fit, so they look the
 // same inline and full screen. Like slides in a presentation app, they never
-// scroll: the deck fits the window, and a slide's content fits the slide.
+// scroll: the deck fills its parent, and a slide's content fits the slide.
 const canvasWidth = 960
 const canvasHeight = 540
 
-/** Height of the controls under the slide, and the gap above them. */
-const controlsHeight = 36
-
-/** How much to scale the canvas to fit inside `frame`. */
-function useFitScale(frame: RefObject<HTMLDivElement | null>) {
+/** How much to scale the canvas to fit inside `area`. */
+function useFitScale(area: RefObject<HTMLDivElement | null>) {
   const [scale, setScale] = useState(0)
 
   useLayoutEffect(() => {
-    const element = frame.current
+    const element = area.current
     if (!element) return
 
     const observer = new ResizeObserver(([entry]) => {
@@ -91,11 +88,12 @@ function usesArrowKeys(element: EventTarget) {
 }
 
 export function Slides({ children }: PropsOf<'Slides'>) {
-  // The deck runs to the bottom of the window; the slide is as wide as fits.
-  const { ref: deck, height } = useFillHeight(true)
-  const frame = useRef<HTMLDivElement>(null)
+  // The deck fills its parent (see [data-fill] in index.css), and the slide is
+  // as big as fits in what the controls leave.
+  const deck = useRef<HTMLDivElement>(null)
+  const area = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLDivElement>(null)
-  const scale = useFitScale(frame)
+  const scale = useFitScale(area)
 
   const [index, setIndex] = useState(0)
   const count = useSlides(canvas, index)
@@ -163,33 +161,32 @@ export function Slides({ children }: PropsOf<'Slides'>) {
       // biome-ignore lint/a11y/noNoninteractiveTabindex: the deck takes focus so arrow keys change slides
       tabIndex={0}
       onKeyDown={onKeyDown}
-      className="flex flex-col gap-2 bg-background outline-none data-[fullscreen=true]:p-4"
+      className="flex min-h-60 flex-col gap-2 bg-background outline-none data-[fullscreen=true]:p-4"
+      data-fill
       data-fullscreen={fullscreen}
     >
-      <div
-        ref={frame}
-        className={cn(
-          'relative overflow-hidden',
-          fullscreen
-            ? 'flex-1'
-            : 'mx-auto aspect-video w-full rounded-xl border border-line',
-        )}
-        style={
-          fullscreen || height === undefined
-            ? undefined
-            : { maxWidth: ((height - controlsHeight) * 16) / 9 }
-        }
-      >
+      <div ref={area} className="relative min-h-0 flex-1">
         <div
-          ref={canvas}
-          className="absolute top-1/2 left-1/2"
+          className={cn(
+            'absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 overflow-hidden',
+            !fullscreen && 'rounded-xl border border-line',
+          )}
           style={{
-            width: canvasWidth,
-            height: canvasHeight,
-            transform: `translate(-50%, -50%) scale(${scale})`,
+            width: canvasWidth * scale,
+            height: canvasHeight * scale,
           }}
         >
-          {children}
+          <div
+            ref={canvas}
+            className="origin-top-left"
+            style={{
+              width: canvasWidth,
+              height: canvasHeight,
+              transform: `scale(${scale})`,
+            }}
+          >
+            {children}
+          </div>
         </div>
       </div>
       <div className="flex items-center justify-center gap-2">

@@ -14,7 +14,13 @@ import {
 import { getDb } from './db'
 import { isUniqueViolation } from './db/errors'
 import { apps, docs, type Script, scripts } from './db/schema'
-import { docErrors, docsRunning, toDocJson, toDocSummary } from './docs'
+import {
+  docErrors,
+  docsMounting,
+  docsRunning,
+  toDocJson,
+  toDocSummary,
+} from './docs'
 import { executeScript } from './execute'
 import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
 import type { ScriptError } from './script-error'
@@ -97,21 +103,8 @@ async function uniqueName(kind: string, fn: () => Promise<CallToolResult>) {
   }
 }
 
-/** Adds a note listing the apps and docs that run a script, when there are any. */
-async function withAppsNote(
-  result: CallToolResult,
-  scriptName: string,
-  note: string,
-) {
-  const [appNames, docNames] = await Promise.all([
-    appsRunning(scriptName),
-    docsRunning(scriptName),
-  ])
-  const names = [
-    ...appNames.map((name) => `app ${name}`),
-    ...docNames.map((name) => `doc ${name}`),
-  ]
-
+/** Adds `note` and a list of `names` to a result, when there are any. */
+function withNote(result: CallToolResult, note: string, names: string[]) {
   if (names.length === 0) {
     return result
   }
@@ -123,6 +116,23 @@ async function withAppsNote(
       { type: 'text' as const, text: `${note}: ${names.join(', ')}` },
     ],
   }
+}
+
+/** Adds a note listing the apps and docs that run a script, when there are any. */
+async function withAppsNote(
+  result: CallToolResult,
+  scriptName: string,
+  note: string,
+) {
+  const [appNames, docNames] = await Promise.all([
+    appsRunning(scriptName),
+    docsRunning(scriptName),
+  ])
+
+  return withNote(result, note, [
+    ...appNames.map((name) => `app ${name}`),
+    ...docNames.map((name) => `doc ${name}`),
+  ])
 }
 
 const scriptId = z.uuid().describe('Script ID')
@@ -155,9 +165,9 @@ Before creating or changing an app, call get_app_guide once: it documents the sp
 
 Less is more: build only what the user asked for, with the fewest elements that do it. No headings, intro text or other filler (the navbar already shows the app's title and description), and no features nobody asked for.
 
-Fit the window: the page shouldn't scroll. Put anything that grows with data (tables, lists, message bodies) in a ScrollArea so it scrolls on its own; side-by-side panes each get a ScrollArea that fills the window.
+Fit the page: an app fills whatever it's shown in (its page, or a block in a doc) and shouldn't scroll as a whole. Put anything that grows with data (tables, lists, message bodies) in a ScrollArea so it scrolls on its own; side-by-side panes each get a ScrollArea that fills the space left in them.
 
-Docs are Notion-like Markdown pages at ${baseUrl}/docs/<name> that people also edit in the browser. They embed live components (the same json-render specs, in \`\`\`ui code blocks) between paragraphs. Call get_doc_guide before create_doc or update_doc.`
+Docs are Notion-like Markdown pages at ${baseUrl}/docs/<name> that people also edit in the browser. They embed live components (the same json-render specs, or saved apps mounted by name, in \`\`\`ui code blocks) between paragraphs. Call get_doc_guide before create_doc or update_doc.`
 }
 
 /**
@@ -453,7 +463,15 @@ function createMcpServer(baseUrl: string) {
           .where(eq(apps.id, id))
           .returning()
 
-        return app ? ok(toAppJson(app, baseUrl)) : appNotFound()
+        if (!app) {
+          return appNotFound()
+        }
+
+        return withNote(
+          ok(toAppJson(app, baseUrl)),
+          `Renamed from "${existing.name}"; update these docs, which still mount the old name`,
+          existing.name === app.name ? [] : await docsMounting(existing.name),
+        )
       })
     },
   )
@@ -469,9 +487,17 @@ function createMcpServer(baseUrl: string) {
       const [app] = await getDb()
         .delete(apps)
         .where(eq(apps.id, args.id))
-        .returning({ id: apps.id })
+        .returning({ id: apps.id, name: apps.name })
 
-      return app ? ok({ id: app.id }) : appNotFound()
+      if (!app) {
+        return appNotFound()
+      }
+
+      return withNote(
+        ok({ id: app.id }),
+        'These docs still mount the deleted app',
+        await docsMounting(app.name),
+      )
     },
   )
 
