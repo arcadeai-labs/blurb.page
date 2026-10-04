@@ -7,6 +7,10 @@
     ".": {
       "types": "./src/index.ts",
       "default": "./src/index.ts"
+    },
+    "./ui": {
+      "types": "./src/ui/index.ts",
+      "default": "./src/ui/index.ts"
     }
   },
   "scripts": {
@@ -20,6 +24,9 @@
   "dependencies": {
     "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-openapi": "^1.4.0",
+    "@json-render/core": "^0.21.0",
+    "@json-render/react": "^0.21.0",
+    "@json-render/shadcn": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.12.23",

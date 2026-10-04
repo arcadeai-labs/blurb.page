@@ -10,6 +10,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import type { ReactNode } from 'react'
 import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
+import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { apiDocsUrl } from '@/lib/api-url'
 import '../index.css'
@@ -24,7 +25,7 @@ export const Route = createRootRoute({
         name: 'viewport',
         content: 'width=device-width, initial-scale=1',
       },
-      { title: 'CF Hono Starter' },
+      { title: 'every-ui' },
     ],
   }),
   component: RootLayout,
@@ -39,11 +40,9 @@ function RootLayout() {
             <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
               <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
                 <div className="grid gap-0.5">
-                  <strong className="text-sm font-medium">
-                    CF Hono Starter
-                  </strong>
+                  <strong className="text-sm font-medium">every-ui</strong>
                   <span className="text-xs text-muted-foreground">
-                    TanStack Start + Hono API
+                    Apps built by agents over MCP
                   </span>
                 </div>
                 <nav
@@ -52,7 +51,7 @@ function RootLayout() {
                 >
                   <Button variant="ghost" asChild>
                     <Link to="/" activeProps={{ 'aria-current': 'page' }}>
-                      Dashboard
+                      Apps
                     </Link>
                   </Button>
                   <Button variant="ghost" asChild>
@@ -66,6 +65,7 @@ function RootLayout() {
               <Outlet />
             </div>
           </div>
+          <Toaster />
           <TanStackRouterDevtools />
         </TooltipProvider>
       </QueryClientProvider>

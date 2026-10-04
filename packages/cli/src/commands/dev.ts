@@ -2,6 +2,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import type { Command } from 'commander'
 import { APP_NAMES, APP_PORTS, type AppName, isAppName } from '../lib/apps.ts'
 import { openBrowser } from '../lib/browser.ts'
+import { localMcpUrl, writeMcpConfig } from '../lib/mcp-config.ts'
 import { getPortlessRoute } from '../lib/portless.ts'
 import { waitForUrl } from '../lib/wait-for-url.ts'
 import { requireRepoRoot } from '../lib/workspace.ts'
@@ -60,8 +61,10 @@ function startApp(app: AppName, options: DevOptions, repoRoot: string) {
   // (for example Vite's HMR socket) have to be pointed at that hostname,
   // not the port.
   env.PORTLESS_HOST = `${routeName}.localhost`
-  // The frontend proxies `/api` to the Node API server.
+  // The frontend proxies `/api` and `/mcp` to the Node API server.
   env.API_ORIGIN = `http://${options.host}:${APP_PORTS.server}`
+  // The MCP server links to apps on the frontend.
+  env.FRONTEND_URL = getPortlessRoute('frontend', repoRoot).url
 
   const child = spawn('pnpm', ['--filter', `@template/${app}`, 'run', 'dev'], {
     cwd: repoRoot,
@@ -100,6 +103,17 @@ export function registerDevCommand(program: Command) {
       const running = apps
         .filter(isAppName)
         .map((app) => startApp(app, options, repoRoot))
+
+      // Point MCP clients opened in this checkout (e.g. Claude Code) at the
+      // API server that was just started.
+      if (running.some(({ app }) => app === 'server')) {
+        const mcpUrl = localMcpUrl(options.host, APP_PORTS.server)
+        const changed = writeMcpConfig(repoRoot, mcpUrl)
+
+        console.log(
+          `  mcp → ${mcpUrl}${changed ? ' (updated .mcp.json; reconnect your MCP client)' : ''}\n`,
+        )
+      }
       // Open the frontend when it's running, otherwise the API docs.
       const opened = running.find(({ app }) => app === 'frontend') ?? running[0]
       const openUrl = opened.app === 'server' ? `${opened.url}/api` : opened.url
