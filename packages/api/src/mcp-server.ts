@@ -146,7 +146,7 @@ function idOrName<T extends typeof scripts | typeof apps | typeof docs>(
 }
 
 function instructions(baseUrl: string) {
-  return `Build web apps (UIs, forms, tables, charts, dashboards) backed by integration tools.
+  return `Build web apps (UIs, forms, tables, charts, dashboards, slideshows) backed by integration tools.
 
 - Scripts are server-side JavaScript that call the upstream integration tools (list_script_tools) as \`await tools.<functionName>(args)\`, take a validated \`input\` and return JSON.
 - Apps are json-render UI specs rendered with shadcn/ui at ${baseUrl}/apps/<name>. Their buttons, forms and load hooks run scripts by name (the runScript action) and render the results.

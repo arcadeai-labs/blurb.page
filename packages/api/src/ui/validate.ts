@@ -370,8 +370,7 @@ function checkElement(
   key: string,
   element: AppElement,
   names: Names,
-  boundaries: ReadonlySet<string>,
-  repeatsQueryData: boolean,
+  { boundaries, repeatsQueryData, inSlides }: Placement,
 ) {
   const where = `elements.${key}`
   const errors: string[] = []
@@ -407,6 +406,12 @@ function checkElement(
     )
   }
 
+  if (element.type === 'ScrollArea' && inSlides) {
+    errors.push(
+      `${where} (ScrollArea): slides don't scroll, like slides in a presentation; content that doesn't fit is shrunk, so split long content across slides instead`,
+    )
+  }
+
   if (element.type === 'Query') {
     const query = element.props.query
 
@@ -437,8 +442,21 @@ function checkElement(
   return errors
 }
 
-/** Where an element sits: the Query elements around it, and whether it repeats over query data. */
-type Placement = { boundaries: ReadonlySet<string>; repeatsQueryData: boolean }
+/**
+ * Where an element sits: the Query elements around it, whether it repeats
+ * over query data, and whether it's in a Slides deck.
+ */
+type Placement = {
+  boundaries: ReadonlySet<string>
+  repeatsQueryData: boolean
+  inSlides: boolean
+}
+
+const topLevel: Placement = {
+  boundaries: new Set(),
+  repeatsQueryData: false,
+  inSlides: false,
+}
 
 /** Walks the element tree from the root to find each element's placement. */
 function placements(spec: AppSpec) {
@@ -467,6 +485,7 @@ function placements(spec: AppSpec) {
         typeof repeatPath === 'string'
           ? isReserved(repeatPath)
           : placement.repeatsQueryData,
+      inSlides: placement.inSlides || element.type === 'Slides',
     }
     const childAncestors = new Set([...ancestors, key])
 
@@ -478,11 +497,7 @@ function placements(spec: AppSpec) {
     }
   }
 
-  visit(
-    spec.root,
-    { boundaries: new Set(), repeatsQueryData: false },
-    new Set(),
-  )
+  visit(spec.root, topLevel, new Set())
   return found
 }
 
@@ -541,13 +556,8 @@ export function validateApp(
 
   const placed = placements(spec)
   for (const [key, element] of Object.entries(spec.elements)) {
-    const { boundaries, repeatsQueryData } = placed.get(key) ?? {
-      boundaries: new Set<string>(),
-      repeatsQueryData: false,
-    }
-
     errors.push(
-      ...checkElement(key, element, names, boundaries, repeatsQueryData),
+      ...checkElement(key, element, names, placed.get(key) ?? topLevel),
     )
   }
 
