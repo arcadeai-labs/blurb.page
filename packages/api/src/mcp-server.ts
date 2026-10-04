@@ -27,6 +27,7 @@ import {
 import { executeScript } from './execute'
 import {
   type McpConnection,
+  listAllTools,
   McpUnavailableError,
   toFunctionName,
   withMcpClient,
@@ -245,9 +246,7 @@ function createMcpServer(
     },
     () =>
       upstream(async () => {
-        const { tools } = await withMcpClient(await connection(), (client) =>
-          client.listTools(),
-        )
+        const tools = await withMcpClient(await connection(), listAllTools)
 
         return ok({
           tools: tools.map((tool) => ({
