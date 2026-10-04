@@ -14,7 +14,7 @@ type ApiOptions = {
 }
 
 const BASE_URL_HELP =
-  'API origin (defaults to $TEMPLATE_API_BASE_URL, then the portless server URL)'
+  'API origin (defaults to $TEMPLATE_API_BASE_URL, then the portless app URL)'
 
 /**
  * Shared options for every API subcommand, so `--base-url` can be passed after

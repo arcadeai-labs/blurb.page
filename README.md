@@ -3,31 +3,42 @@
 This template is a PNPM/Turbo monorepo:
 
 - `packages/api`: the Hono (OpenAPI) app — the single source of truth for the API
-- `packages/cli`: the `template` CLI — dev servers and typed API access
-- `apps/frontend`: TanStack Start React app on a Cloudflare Worker that renders apps
-- `apps/server`: Node server (`@hono/node-server`) that serves `packages/api`
+- `packages/cli`: the `template` CLI — dev server and typed API access
+- `apps/frontend`: TanStack Start React app that renders apps and serves the API
 
-The API is Node-only: script execution uses the [`run`](https://www.run-sdk.dev)
-sandbox, which needs `node:worker_threads`. The frontend stays a Worker.
+Everything is one Node server: `apps/frontend` serves the UI, mounts the Hono
+app at `/api` (`src/routes/api/$.ts`) and its MCP server at `/mcp`
+(`src/routes/mcp.ts`). It has to be Node because script execution uses the
+[`run`](https://www.run-sdk.dev) sandbox, which needs `node:worker_threads`.
 
-`pnpm dev` runs `pnpm cli dev`, which starts both apps through portless with
-HTTPS enabled:
-
-- `https://frontend.localhost` — the app; Vite proxies `/api` to the API server
-- `https://server.localhost/api` — Swagger UI for the Hono app
-
-On non-`main` branches the branch slug is prepended to the hostname, for example
+`pnpm dev` runs `pnpm cli dev`, which starts it through portless with HTTPS
+enabled at `https://frontend.localhost` (Swagger UI at `/api`). On non-`main`
+branches the branch slug is prepended to the hostname, for example
 `https://my-branch.frontend.localhost`.
 
-The frontend is a thin renderer: it talks to the API's MCP server (`/mcp`), the
-same interface agents use, to load apps and run their scripts. In dev it calls
-the API on the current origin through the Vite proxy (`/api` and `/mcp`); set
-`VITE_API_BASE_URL` to point a deployed frontend at the deployed API.
+The frontend is a thin renderer: it talks to the MCP server (`/mcp`), the same
+interface agents use, to load apps and run their scripts.
+
+## Deploying
+
+The server is built with [Nitro](https://nitro.build) and has no host-specific
+code. `pnpm build` produces a plain Node server:
 
 ```sh
-pnpm dev:server     # just the API, at https://server.localhost
-pnpm start          # the API without watch mode
+pnpm build
+pnpm start          # node .output/server/index.mjs, reading the repo-root .env files
 ```
+
+It listens on `PORT` (default 3000) on all interfaces, so the same output runs
+in a Docker container. On Vercel, set the project's root directory to
+`apps/frontend`; Nitro detects Vercel at build time and emits a Node function
+instead.
+
+Configure `DATABASE_URL`, `MCP_URL`, `ARCADE_API_KEY` and `ARCADE_USER_ID` in
+the environment, and run `pnpm db:migrate` against the database before
+deploying a schema change. App URLs use the request's origin; set
+`FRONTEND_URL` when that differs from the public URL (for example behind a
+proxy that terminates TLS).
 
 ## Scripts
 
@@ -50,8 +61,8 @@ Tool results come back as structured content, or as parsed JSON text, or as plai
 text. Script failures, including tool errors, return
 `{ ok: false, error: { code, message } }`. The server sends
 `Authorization: Bearer $ARCADE_API_KEY` and `Arcade-User-ID: $ARCADE_USER_ID`
-to the MCP server when those are set. `apps/server` reads the repo-root
-`.env.local` and `.env`.
+to the MCP server when those are set. The dev server and `pnpm start` read the
+repo-root `.env.local` and `.env`.
 
 ## Apps
 
@@ -64,7 +75,7 @@ rendered in tables, charts, metrics and forms; data is only read inside a
 `Query` element, so loading and error states are always handled.
 
 Apps are created and changed over MCP. An agent needs only the MCP URL
-(`http://127.0.0.1:8787/mcp`, or `/mcp` on the frontend origin): the server's
+(`http://127.0.0.1:5173/mcp` in dev, or `/mcp` on the deployed origin): the server's
 instructions explain the workflow, and `get_app_guide` documents the spec
 format, every component and action, and common patterns with a full example.
 `create_app` / `update_app` validate specs (components, props, actions, script
@@ -78,9 +89,8 @@ The catalog lives in `packages/api/src/ui` and is shared with the frontend as
 `packages/cli` is exposed at the repo root as `pnpm cli`:
 
 ```sh
-pnpm cli dev                 # API + frontend on portless, opens the browser when ready
+pnpm cli dev                 # the app on portless, opens the browser when ready
 pnpm cli dev --no-open       # …without opening the browser
-pnpm cli dev server          # just apps/server
 pnpm cli api stats           # GET /api/stats
 pnpm cli api stats --json    # raw JSON
 pnpm cli api openapi         # GET /api/openapi.json
@@ -93,18 +103,18 @@ pnpm cli api scripts execute <id> --input '{"count": 5}'
 ```
 
 `pnpm dev` is `pnpm cli dev`: it starts the portless HTTPS proxy, registers the
-branch's alias for each app, runs each app's own `dev` script behind it, waits for the URL to
-answer and opens it in a browser, then removes the alias on exit. When it starts
-the API server, it also points the `every-ui` entry in the repo's `.mcp.json` at
-that server's MCP endpoint (`http://127.0.0.1:8787/mcp`), so MCP clients opened in
-the checkout, like Claude Code, use it. Other entries are kept, and it uses the
-loopback URL because Node-based clients don't trust the portless CA. Running an
-app's `dev` script directly (`pnpm --filter @template/frontend dev`) skips
-portless and serves plain HTTP on the app's port.
+branch's alias for the app, runs its `dev` script behind it, waits for the URL to
+answer and opens it in a browser, then removes the alias on exit. It also points
+the `every-ui` entry in the repo's `.mcp.json` at the MCP endpoint
+(`http://127.0.0.1:5173/mcp`), so MCP clients opened in the checkout, like
+Claude Code, use it. Other entries are kept, and it uses the loopback URL
+because Node-based clients don't trust the portless CA. Running the `dev` script
+directly (`pnpm --filter @template/frontend dev`) skips portless and serves
+plain HTTP on port 5173.
 
 The `api` commands call the same Hono app through the typed RPC client, so they
 stay in sync with `packages/api`. They target `--base-url`, or `$TEMPLATE_API_BASE_URL`, or the
-portless server URL. Node does not read the system trust
+portless app URL. Node does not read the system trust
 store, so the CLI adds the portless CA (`~/.portless/ca.pem`) to its own trust
 list to reach `https://*.localhost`.
 
@@ -121,7 +131,7 @@ plain `DATABASE_URL` (`postgres.js`); routes use the shared client from `getDb()
   `pnpm db:local` to serve it at `postgres://postgres:postgres@127.0.0.1:5433/postgres`.
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio` read `DATABASE_URL`
   from the environment, then from the repo-root `.env.local` or `.env`.
-- `apps/server` reads it from the same files. Migrations never run on startup.
+- The server reads it from the same files. Migrations never run on startup.
 
 ## Commands
 
@@ -132,11 +142,5 @@ pnpm build
 pnpm typecheck
 pnpm lint
 pnpm fmt
-pnpm deploy
-```
-
-Regenerate the frontend Worker's environment types after changing its `wrangler.jsonc`:
-
-```sh
-pnpm cf-typegen
+pnpm start
 ```

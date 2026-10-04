@@ -1,12 +1,13 @@
 import type { AppType } from '@template/api'
 import { hc } from 'hono/client'
+import { APP_NAME } from './apps.ts'
 import { getPortlessRoute } from './portless.ts'
 import { trustPortlessCa } from './tls.ts'
 import { findRepoRoot } from './workspace.ts'
 
 /**
  * Where the API lives. Explicit `--base-url` wins, then `TEMPLATE_API_BASE_URL`,
- * then the portless URL of the Node API server.
+ * then the app's portless URL.
  */
 export function resolveBaseUrl(explicit?: string): string {
   const configured = explicit ?? process.env.TEMPLATE_API_BASE_URL
@@ -15,7 +16,7 @@ export function resolveBaseUrl(explicit?: string): string {
     return configured.replace(/\/$/, '')
   }
 
-  return getPortlessRoute('server', findRepoRoot() ?? process.cwd()).url
+  return getPortlessRoute(APP_NAME, findRepoRoot() ?? process.cwd()).url
 }
 
 export function createApiClient(baseUrl: string) {

@@ -4,13 +4,9 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**", ".output/**", ".vinxi/**"]
+      "outputs": ["dist/**", ".output/**"]
     },
     "@template/api#build": {
-      "dependsOn": ["^build"],
-      "outputs": []
-    },
-    "@template/server#build": {
       "dependsOn": ["^build"],
       "outputs": []
     },
@@ -18,17 +14,9 @@
       "dependsOn": ["^typecheck"],
       "outputs": []
     },
-    "cf-typegen": {
-      "cache": false,
-      "outputs": []
-    },
     "preview": {
       "cache": false,
       "persistent": true
-    },
-    "deploy": {
-      "dependsOn": ["build"],
-      "cache": false
     }
   }
 }

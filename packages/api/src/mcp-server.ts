@@ -113,20 +113,23 @@ function idOrName<T extends typeof scripts | typeof apps>(
   return undefined
 }
 
-function instructions() {
+function instructions(baseUrl: string) {
   return `Build web apps (UIs, forms, tables, charts, dashboards) backed by integration tools.
 
 - Scripts are server-side JavaScript that call the upstream integration tools (list_script_tools) as \`await tools.<functionName>(args)\`, take a validated \`input\` and return JSON.
-- Apps are json-render UI specs rendered with shadcn/ui at ${frontendUrl()}/apps/<name>. Their buttons, forms and load hooks run scripts by name (the runScript action) and render the results.
+- Apps are json-render UI specs rendered with shadcn/ui at ${baseUrl}/apps/<name>. Their buttons, forms and load hooks run scripts by name (the runScript action) and render the results.
 
 Before creating or changing an app, call get_app_guide once: it documents the spec format, every component and action, and patterns for loading data, forms, tables, charts and row actions. Typical flow: list_script_tools → create_script (one per data operation; test with execute_script) → create_app → share the returned url. Use the list_/get_/update_/delete_ tools to change existing scripts and apps.`
 }
 
-/** The API's operations, exposed as MCP tools. */
-function createMcpServer() {
+/**
+ * The API's operations, exposed as MCP tools. `baseUrl` is where apps are
+ * rendered.
+ */
+function createMcpServer(baseUrl: string) {
   const server = new McpServer(
     { name: 'every-ui', version: '0.0.0' },
-    { instructions: instructions() },
+    { instructions: instructions(baseUrl) },
   )
 
   server.registerTool(
@@ -150,7 +153,7 @@ function createMcpServer() {
         'How to build apps: the workflow, how scripts and apps fit together, the json-render spec format, every component and action with their props, expressions, and a complete example. Read it before create_app or update_app.',
       annotations: { readOnlyHint: true },
     },
-    () => ({ content: [{ type: 'text', text: appGuide(frontendUrl()) }] }),
+    () => ({ content: [{ type: 'text', text: appGuide(baseUrl) }] }),
   )
 
   server.registerTool(
@@ -332,7 +335,7 @@ function createMcpServer() {
         .from(apps)
         .orderBy(desc(apps.updatedAt))
 
-      return ok({ apps: rows.map(toAppSummary) })
+      return ok({ apps: rows.map((app) => toAppSummary(app, baseUrl)) })
     },
   )
 
@@ -352,7 +355,7 @@ function createMcpServer() {
 
       const [app] = await getDb().select().from(apps).where(where)
 
-      return app ? ok(toAppJson(app)) : appNotFound()
+      return app ? ok(toAppJson(app, baseUrl)) : appNotFound()
     },
   )
 
@@ -373,7 +376,7 @@ function createMcpServer() {
       return uniqueName('app', async () => {
         const [app] = await getDb().insert(apps).values(args).returning()
 
-        return ok(toAppJson(app))
+        return ok(toAppJson(app, baseUrl))
       })
     },
   )
@@ -412,7 +415,7 @@ function createMcpServer() {
           .where(eq(apps.id, id))
           .returning()
 
-        return app ? ok(toAppJson(app)) : appNotFound()
+        return app ? ok(toAppJson(app, baseUrl)) : appNotFound()
       })
     },
   )
@@ -448,7 +451,7 @@ export async function handleMcpRequest(request: Request) {
     return new Response(null, { status: 405, headers: { Allow: 'POST' } })
   }
 
-  const server = createMcpServer()
+  const server = createMcpServer(frontendUrl(request))
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,
     enableJsonResponse: true,

@@ -1,13 +1,7 @@
-/** Apps that can be served behind the portless proxy, and the port each uses. */
-export const APP_PORTS = {
-  frontend: 5173,
-  server: 8787,
-}
+/**
+ * The app served behind the portless proxy, and its port. It serves the UI,
+ * the API at `/api` and the MCP server at `/mcp`.
+ */
+export const APP_NAME = 'frontend'
 
-export type AppName = keyof typeof APP_PORTS
-
-export const APP_NAMES = Object.keys(APP_PORTS)
-
-export function isAppName(value: string): value is AppName {
-  return Object.hasOwn(APP_PORTS, value)
-}
+export const APP_PORT = 5173

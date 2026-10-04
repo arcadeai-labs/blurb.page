@@ -7,7 +7,7 @@ import { scriptsRoutes } from './routes/scripts'
 import { statsRoutes } from './routes/stats'
 import { toolsRoutes } from './routes/tools'
 
-/** Path the API is mounted at by `apps/server`. */
+/** Path the API is mounted at by `apps/frontend`. */
 export const apiBasePath = '/api'
 
 export const api = new OpenAPIHono()
