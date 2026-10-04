@@ -40,6 +40,28 @@ deploying a schema change. App URLs use the request's origin; set
 `FRONTEND_URL` when that differs from the public URL (for example behind a
 proxy that terminates TLS).
 
+### Preview databases on Vercel
+
+Preview deployments each get their own Neon branch through the
+[Neon-managed Vercel integration](https://neon.com/docs/guides/neon-managed-vercel-integration).
+On every preview deployment it branches the Neon project's default branch into
+`preview/<git-branch>` and sets `DATABASE_URL` / `DATABASE_URL_UNPOOLED` for
+that deployment. To set it up:
+
+1. In the Neon Console, open the project → **Integrations** → **Vercel** → **Add**,
+   then **Link Existing Neon Account** and pick the Vercel project, database
+   and role.
+2. Turn on **Automatically delete obsolete Neon branches**, so a preview branch
+   is removed after its Git branch is deleted. The integration also points
+   Production and Development's `DATABASE_URL` at the default branch.
+3. Set `MCP_URL`, `ARCADE_API_KEY` and `ARCADE_USER_ID` for the Preview
+   environment in Vercel too.
+
+`apps/frontend/vercel.json` runs `pnpm db:migrate` before the build on preview
+deployments only, so each branch gets the PR's migrations. Production is still
+migrated by hand, and nothing migrates on startup. Don't rename a Git branch
+with a preview database: the integration matches Neon branches by name.
+
 ## Scripts
 
 `/api/scripts` is CRUD for saved scripts, and `POST /api/scripts/:id/execute`
@@ -130,7 +152,8 @@ plain `DATABASE_URL` (`postgres.js`); routes use the shared client from `getDb()
 - Without `DATABASE_URL`, everything falls back to a local PGlite database. Run
   `pnpm db:local` to serve it at `postgres://postgres:postgres@127.0.0.1:5433/postgres`.
 - `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio` read `DATABASE_URL`
-  from the environment, then from the repo-root `.env.local` or `.env`.
+  from the environment, then from the repo-root `.env.local` or `.env`. They
+  use `DATABASE_URL_UNPOOLED` (Neon's direct connection) when it's set.
 - The server reads it from the same files. Migrations never run on startup.
 
 ## Commands
