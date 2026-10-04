@@ -39,7 +39,7 @@ function AppPage() {
   const app = appQuery.data
 
   return (
-    <Page title={app.title} description={app.description}>
+    <Page title={app.title} description={app.description} fill>
       {/* A changed app (e.g. updated by an agent) remounts with fresh state. */}
       <AppRenderer
         key={`${app.id}:${app.updatedAt}`}

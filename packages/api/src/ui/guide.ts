@@ -344,22 +344,23 @@ Build exactly what the user asked for, with the fewest elements that do it well.
 - Short labels (a word or two) for titles, columns, buttons and fields. Leave optional props like description, caption and placeholder out unless they say something new.
 - Flat layouts: one Stack of sections. Wrap a section in a Card only when the page has several; skip Tabs, Accordions and Dialogs unless the content needs them.
 
-## Fit the window
+## Fit the page
 
-An app should fit in the browser window like a desktop app: the page itself shouldn't scroll, its long parts should. Anything that grows with data (tables, lists, repeated items, message or document bodies, logs, JsonView) goes in a ScrollArea, which scrolls on its own instead of stretching the page. Slideshows are the exception: slides never scroll (see Slideshows).
+An app should fit what it's shown in like a desktop app fits its window: its page under the navbar, or a block when it's mounted in a doc. It shouldn't scroll as a whole; its long parts should. Anything that grows with data (tables, lists, repeated items, message or document bodies, logs, JsonView) goes in a ScrollArea, which scrolls on its own instead of stretching the page. Slideshows are the exception: slides never scroll (see Slideshows).
 
 - Wrap only the long part, inside its Card and Query: keep a Card's title, toolbar and buttons outside the ScrollArea so they stay put.
-- Side-by-side panes (list and detail, inbox and message): a Grid of panes, each with a ScrollArea without a height. Both fill the window down to the bottom and scroll independently.
-- A ScrollArea without a height must be the last thing in its pane: put actions and forms (e.g. a reply box) above it, or give it a height.
+- Side-by-side panes (list and detail, inbox and message): a Grid of panes, each with a ScrollArea without a height. The Grid and the Cards around them stretch to fill the page, and each ScrollArea takes the space left in its pane and scrolls on its own. Actions and forms above or below it (e.g. a reply box) stay in view.
 - Elsewhere (a table under a form, a list in a Dialog, a long Card among others) give the ScrollArea a height in px, around 300–500.
-- Keep what sits above the panes short (a toolbar, a row of Metrics) so they get most of the window.
+- Keep what sits above the panes short (a toolbar, a row of Metrics) so they get most of the page.
 
 ## Workflow
 
 1. list_script_tools — the integration tools scripts can call (and their input schemas).
 2. create_script — one script per data operation the app needs (list, get, create, update, delete, aggregate for a chart…). Test each with execute_script before wiring it into a UI.
 3. create_app — the spec: its elements, plus the queries that load data and the mutations that change it. The response has the app URL. It is rejected with a list of errors if anything is invalid; fix them and retry.
-4. Iterate with get_app / update_app (send the whole spec) / delete_app, and list_apps / list_scripts to see what exists.
+4. Iterate with get_app / update_app (send the whole spec) / delete_app, and list_apps / list_scripts / list_svgs to see what exists.
+
+Images (diagrams, illustrations, icons) are SVGs saved with create_svg and shown by name with the Svg component; see SVGs.
 
 ## Scripts
 
@@ -445,20 +446,35 @@ Mutations:
 - Empty states: inside the Query, a Text with visible: { "$state": "/queries/items/data/0", "not": true }.
 - Forms: bind inputs with { "$bindState": "/form/<field>" }, add checks for validation, and submit with a Button whose on.press is [mutate with "validate": true, setState to reset /form, toast]. The mutation's input is { "$state": "/form" } and it invalidates the list query.
 - Row actions: RowTable with "repeat": { "statePath": "/queries/items/data", "key": "id" } and a RowTableRow child; buttons in the row run mutate with "input": { "id": { "$item": "id" } }.
-- Master/detail: DataTable with "selected": { "$bindState": "/selected" }, and a detail query with "input": { "id": { "$state": "/selected/id" } } and "enabled": { "$state": "/selected" }, shown in its own Query element. Lay them out as side-by-side panes, each with its long content in a ScrollArea without a height (see Fit the window).
+- Master/detail: DataTable with "selected": { "$bindState": "/selected" }, and a detail query with "input": { "id": { "$state": "/selected/id" } } and "enabled": { "$state": "/selected" }, shown in its own Query element. Lay them out as side-by-side panes, each with its long content in a ScrollArea without a height (see Fit the page).
 - Filters and search: bind a Select/Input to /filter and use { "$state": "/filter" } in the query input; the query refetches when it changes.
 - Edit dialogs: DataTable with "selected": { "$bindState": "/selected" } and on.select running setState { "statePath": "/editing", "value": true }; a Dialog with openPath "/editing" holds inputs bound to /selected/<field> (edits change /selected, not the query data); Save runs mutate with "input": { "$state": "/selected" }, then setState /editing false.
 - Note: a top-level { "$item": "field" } action param resolves to the item's state path, not its value; nest it (e.g. "input": { "id": { "$item": "id" } }) to pass the value.
 - Pages: Tabs with value { "$bindState": "/tab" } and sections with visible conditions, or Link to another app at "/apps/<name>".
+
+## SVGs
+
+Diagrams, illustrations, icons and logos are SVGs, saved on their own with create_svg (and list_svgs / get_svg / update_svg / delete_svg) and shown in any app by name:
+
+\`\`\`json
+{ "type": "Svg", "props": { "name": "runtime-diagram", "alt": "Agents call tools through Arcade" }, "children": [] }
+\`\`\`
+
+- The markup is one standalone \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H">\` element. Give it a viewBox (not just width and height) so it scales to fit; it fills the width of its container, or set the Svg's height in px.
+- It is drawn like an image: scripts, event handlers, links and external images or fonts do nothing. Text uses system fonts, so set font-family="sans-serif".
+- Use theme colors so it matches the app: currentColor (the text color) and var(--foreground), var(--muted-foreground), var(--background), var(--muted), var(--line), var(--primary), var(--primary-foreground) and var(--chart-1) … var(--chart-5).
+- An updated SVG shows up in every app that uses it, so fix a diagram with update_svg rather than saving a copy.
+- Charts of data are a Chart, not an SVG.
 
 ## Slideshows
 
 A presentation is an app whose root is a Slides element with one Slide child per slide. Slides shows one at a time with previous/next buttons, arrow keys and a full-screen button, so the spec needs no navigation of its own.
 
 - Write text with Markdown: a few short bullets per slide, not paragraphs. Each Slide has a title and a layout ("title", "section", "content" or "two-column").
+- Show ideas with visuals: an Svg diagram beside the bullets in a "two-column" slide, or an illustration under the title of a "title" or "section" slide (give it a height there, e.g. 160).
 - Slides can show live data: wrap a Chart, Metric or DataTable in a Query, or put values in Markdown with $template, exactly as in any other app.
 - One slide per row of data: "repeat" on the Slides element with a single Slide child that reads { "$item": "field" }.
-- Slides never scroll, like slides in a presentation: the deck fits the window, and a slide whose content doesn't fit is shrunk until it does. No ScrollArea in a deck; split long content (a long list, a table with many rows) across slides, e.g. a few rows per slide.
+- Slides never scroll, like slides in a presentation: the deck fills the space it's given, and a slide whose content doesn't fit is shrunk until it does. No ScrollArea in a deck; split long content (a long list, a table with many rows) across slides, e.g. a few rows per slide.
 
 \`\`\`json
 ${JSON.stringify(exampleSlides, null, 2)}
@@ -535,7 +551,9 @@ The editor understands: headings (#, ##, ###), paragraphs, **bold**, *italic*, ~
 
 ## Embedded components
 
-A fenced code block with the language \`ui\` is a live component. Its body is a json-render spec in JSON, the same format as an app's spec (call get_app_guide for the components, expressions, queries and mutations):
+A fenced code block with the language \`ui\` is a live component. Its body is JSON, either:
+
+- a json-render spec, the same format as an app's spec (call get_app_guide for the components, expressions, queries and mutations):
 
 \`\`\`\`md
 \`\`\`ui
@@ -543,10 +561,18 @@ A fenced code block with the language \`ui\` is a live component. Its body is a 
 \`\`\`
 \`\`\`\`
 
+- or a saved app, mounted by name (see list_apps). It shows the app as it is now, with its title and a link to open it, and follows changes to it:
+
+\`\`\`\`md
+\`\`\`ui
+{ "app": "issue-tracker" }
+\`\`\`
+\`\`\`\`
+
 - Each block is self-contained: its own state, queries and mutations. Blocks that run the same script with the same input share one request.
 - Keep blocks small and focused (a chart, a table, a few Metrics, a short form) and put the explanation in Markdown around them, not in Text elements.
-- A ScrollArea needs a height: docs scroll, so nothing fills the window.
-- Every block is validated like an app spec, including that the scripts it runs exist. Invalid docs are rejected with errors that name the block ("ui block 2: …").
+- Blocks take the height of their content, except blocks with something that fills its parent (a ScrollArea without a height, Slides, and most apps), which are 600px tall. Add "height": <px> next to "root" or "app" to change it.
+- Every block is validated: specs like an app spec, including that the scripts they run exist, and mounted apps must exist. Invalid docs are rejected with errors that name the block ("ui block 2: …").
 
 ## Workflow
 

@@ -1,10 +1,13 @@
-import { embedLanguage, parseEmbed } from '@template/api/ui'
+import { type Embed, embedLanguage, parseEmbed } from '@template/api/ui'
+import { useQuery } from '@tanstack/react-query'
+import { Link } from '@tanstack/react-router'
 import { mergeAttributes, Node } from '@tiptap/core'
 import {
   NodeViewWrapper,
   type ReactNodeViewProps,
   ReactNodeViewRenderer,
 } from '@tiptap/react'
+import { cn } from 'cn'
 import { useState } from 'react'
 import { AppRenderer } from '@/components/app-renderer/app-renderer'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -17,7 +20,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Field, FieldError, FieldLabel } from '@/components/ui/field'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Textarea } from '@/components/ui/textarea'
+import { getApp } from '@/lib/mcp'
 
 /** What the slash menu inserts: a component to replace with something useful. */
 export const newEmbedSource = JSON.stringify(
@@ -106,6 +111,64 @@ function EditEmbedDialog({
   )
 }
 
+/** A saved app, mounted by name and kept up to date with it. */
+function MountedApp({ name }: { name: string }) {
+  const appQuery = useQuery({
+    queryKey: ['apps', name],
+    queryFn: () => getApp(name),
+  })
+
+  if (appQuery.isPending) {
+    return <Skeleton className="h-32" />
+  }
+
+  if (appQuery.isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Could not load the app</AlertTitle>
+        <AlertDescription>{appQuery.error.message}</AlertDescription>
+      </Alert>
+    )
+  }
+
+  const app = appQuery.data
+
+  return (
+    <>
+      <div className="flex items-center justify-between gap-4">
+        <div className="grid min-w-0 gap-0.5">
+          <p className="truncate text-sm font-medium">{app.title}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {app.description}
+          </p>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          nativeButton={false}
+          render={<Link to="/apps/$name" params={{ name: app.name }} />}
+        >
+          Open
+        </Button>
+      </div>
+      {/* A changed app (e.g. updated by an agent) remounts with fresh state. */}
+      <AppRenderer
+        key={`${app.id}:${app.updatedAt}`}
+        spec={app.spec}
+        onLoad={app.onLoad}
+      />
+    </>
+  )
+}
+
+function EmbedView({ embed }: { embed: Embed }) {
+  return embed.kind === 'app' ? (
+    <MountedApp name={embed.app} />
+  ) : (
+    <AppRenderer spec={embed.spec} />
+  )
+}
+
 function UiBlockView({
   node,
   editor,
@@ -116,15 +179,24 @@ function UiBlockView({
   const [editing, setEditing] = useState(false)
   const source = String(node.attrs.source ?? '')
   const parsed = parseEmbed(source)
+  const height = parsed.ok ? parsed.height : undefined
 
   return (
     <NodeViewWrapper
-      className="not-prose my-4 grid gap-2"
+      // Blocks are as tall as their content, unless they hold something that
+      // fills its parent (a ScrollArea without a height, Slides): then the
+      // block gives it room, with a default height or the one it sets. Text
+      // inside looks as it does in an app, not like the doc's prose.
+      className={cn(
+        'not-prose my-4 flex flex-col gap-2 leading-normal text-foreground',
+        height === undefined && 'has-[[data-fill]]:h-150',
+      )}
+      style={height === undefined ? undefined : { height }}
       data-selected={selected || undefined}
     >
       {parsed.ok ? (
-        // A changed spec remounts with fresh state, like an updated app.
-        <AppRenderer key={source} spec={parsed.spec} />
+        // A changed block remounts with fresh state, like an updated app.
+        <EmbedView key={source} embed={parsed} />
       ) : (
         <EmbedErrors errors={parsed.errors} />
       )}

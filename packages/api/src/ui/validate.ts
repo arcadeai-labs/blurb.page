@@ -46,6 +46,7 @@ const writtenPathParams = [
 /** What a spec defines that its parts can refer to. */
 type Names = {
   scripts: ReadonlySet<string>
+  svgs: ReadonlySet<string>
   queries: ReadonlySet<string>
   mutations: ReadonlySet<string>
 }
@@ -412,6 +413,16 @@ function checkElement(
     )
   }
 
+  if (element.type === 'Svg') {
+    const name = element.props.name
+
+    if (typeof name === 'string' && !names.svgs.has(name)) {
+      errors.push(
+        `${where} (Svg): no SVG named "${name}" (create it with create_svg, or see list_svgs)`,
+      )
+    }
+  }
+
   if (element.type === 'Query') {
     const query = element.props.query
 
@@ -503,18 +514,18 @@ function placements(spec: AppSpec) {
 
 /**
  * Validates an app beyond its JSON shape: component and prop names, literal
- * prop values, event names, actions and the scripts they run, queries and
- * mutations, and the integrity of the element tree. Returns readable errors,
- * empty when valid.
+ * prop values, event names, actions and the scripts they run, the SVGs it
+ * shows, queries and mutations, and the integrity of the element tree.
+ * Returns readable errors, empty when valid.
  */
 export function validateApp(
   app: { spec: AppSpec; onLoad?: ActionBinding[] },
-  scriptNames: ReadonlySet<string>,
+  existing: { scripts: ReadonlySet<string>; svgs: ReadonlySet<string> },
 ) {
   const { spec } = app
   const errors: string[] = []
   const names: Names = {
-    scripts: scriptNames,
+    ...existing,
     queries: new Set(Object.keys(spec.queries ?? {})),
     mutations: new Set(Object.keys(spec.mutations ?? {})),
   }
@@ -603,21 +614,13 @@ export function referencedScripts(app: {
   return names
 }
 
-/**
- * Validates a component embedded in a doc: an app spec, except that a
- * ScrollArea needs a height, since a doc scrolls rather than fitting the
- * window.
- */
-export function validateEmbed(spec: AppSpec, scriptNames: ReadonlySet<string>) {
-  const errors = validateApp({ spec }, scriptNames)
-
-  for (const [key, element] of Object.entries(spec.elements)) {
-    if (element.type === 'ScrollArea' && element.props.height == null) {
-      errors.push(
-        `elements.${key} (ScrollArea): needs a height in a doc, which scrolls instead of filling the window`,
-      )
-    }
-  }
-
-  return errors
+/** Names of the SVGs an app shows with a literal Svg name. */
+export function referencedSvgs(app: { spec: AppSpec }) {
+  return new Set(
+    Object.values(app.spec.elements).flatMap((element) =>
+      element.type === 'Svg' && typeof element.props.name === 'string'
+        ? [element.props.name]
+        : [],
+    ),
+  )
 }

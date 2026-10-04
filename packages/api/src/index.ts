@@ -15,6 +15,7 @@ import { meRoutes } from './routes/me'
 import { organizationsRoutes } from './routes/organizations'
 import { scriptsRoutes } from './routes/scripts'
 import { statsRoutes } from './routes/stats'
+import { svgsRoutes } from './routes/svgs'
 import { toolsRoutes } from './routes/tools'
 
 /** Path the API is mounted at by `apps/frontend`. */
@@ -38,6 +39,7 @@ export const api = new OpenAPIHono<AuthEnv>()
   .route('/organizations', organizationsRoutes)
   .route('/stats', statsRoutes)
   .route('/scripts', scriptsRoutes)
+  .route('/svgs', svgsRoutes)
   .route('/tools', toolsRoutes)
 
 api.onError((error, c) => {

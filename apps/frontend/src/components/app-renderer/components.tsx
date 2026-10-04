@@ -5,7 +5,7 @@ import {
 } from '@json-render/react'
 import type { customComponentDefinitions, QueryState } from '@template/api/ui'
 import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from 'lucide-react'
-import { Children, useLayoutEffect, useRef, useState } from 'react'
+import { Children } from 'react'
 import {
   Area,
   AreaChart,
@@ -385,66 +385,23 @@ export function RowTableRow({ children }: PropsOf<'RowTableRow'>) {
   )
 }
 
-/** Shortest a ScrollArea that fills the window gets, so small windows scroll the page instead. */
-const minFillHeight = 240
-
-/**
- * The height that takes an element from where it starts to the bottom of the
- * window, less the bottom padding and borders of what contains it (its Card,
- * the page). Re-measured whenever the page's layout or the window changes.
- */
-export function useFillHeight(enabled: boolean) {
-  const ref = useRef<HTMLDivElement>(null)
-  const [height, setHeight] = useState<number>()
-
-  useLayoutEffect(() => {
-    const element = ref.current
-    if (!enabled || !element) return
-
-    const page = element.closest('main') ?? document.body
-    const measure = () => {
-      let below = 0
-      for (
-        let node = element.parentElement;
-        node && node !== document.body;
-        node = node.parentElement
-      ) {
-        const style = getComputedStyle(node)
-        below +=
-          Number.parseFloat(style.paddingBottom) +
-          Number.parseFloat(style.borderBottomWidth)
-        if (node === page) break
-      }
-      const top = element.getBoundingClientRect().top + window.scrollY
-      setHeight(
-        Math.max(minFillHeight, Math.floor(window.innerHeight - top - below)),
-      )
-    }
-
-    measure()
-    const observer = new ResizeObserver(measure)
-    observer.observe(page)
-    window.addEventListener('resize', measure)
-    return () => {
-      observer.disconnect()
-      window.removeEventListener('resize', measure)
-    }
-  }, [enabled])
-
-  return { ref, height }
-}
-
-/** Scrolls its children in a box of a fixed height, or one that fills the window. */
+/** Scrolls its children in a box of a fixed height, or one that fills its parent. */
 export function ScrollArea({ props, children }: PropsOf<'ScrollArea'>) {
-  const fill = useFillHeight(props.height == null)
+  if (props.height != null) {
+    return (
+      <ScrollAreaBox style={{ height: props.height }}>{children}</ScrollAreaBox>
+    )
+  }
 
+  // Takes the space its parent has left (see [data-fill] in index.css). The
+  // box is positioned over it, so long content scrolls instead of stretching
+  // what contains it.
   return (
-    <ScrollAreaBox
-      ref={fill.ref}
-      style={{ height: props.height ?? fill.height }}
-    >
-      {children}
-    </ScrollAreaBox>
+    <div data-fill className="relative min-h-60">
+      <div className="absolute inset-0">
+        <ScrollAreaBox className="size-full">{children}</ScrollAreaBox>
+      </div>
+    </div>
   )
 }
 

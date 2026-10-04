@@ -62,6 +62,17 @@ export const docs = pgTable('docs', {
 
 export type Doc = typeof docs.$inferSelect
 
+/** SVG images, shown in apps by name with the Svg component. */
+export const svgs = pgTable('svgs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  description: text('description').notNull(),
+  markup: text('markup').notNull(),
+  ...timestamps,
+})
+
+export type Svg = typeof svgs.$inferSelect
+
 /**
  * Clients registered with Arcade's OAuth server for local origins, which
  * can't serve a client metadata document Arcade can fetch (see `auth/arcade`).

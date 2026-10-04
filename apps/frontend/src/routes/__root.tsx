@@ -32,7 +32,7 @@ function RootLayout() {
     <RootDocument>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <div className="min-h-svh">
+          <div className="flex min-h-full flex-col">
             <Outlet />
           </div>
           <Toaster />

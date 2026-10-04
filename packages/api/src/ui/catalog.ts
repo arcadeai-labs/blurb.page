@@ -126,7 +126,7 @@ export const customComponentDefinitions = {
     }),
     slots: ['default'],
     description:
-      'Fixed-height box that scrolls its children, so long content (tables, lists, message bodies, logs) scrolls on its own instead of growing the page. Wrap just the long part, inside its Card and Query. height is in px; leave it out to fill the window down to the bottom of the page, which suits side-by-side panes. A ScrollArea that fills must be the last thing in its section: content below it is pushed out of view.',
+      'Fixed-height box that scrolls its children, so long content (tables, lists, message bodies, logs) scrolls on its own instead of growing the page. Wrap just the long part, inside its Card and Query. height is in px; leave it out to fill the space its section has left (at least 240px), which suits side-by-side panes: the Cards, Stacks and Grids around it stretch to fill the page, and content above and below it stays in view.',
     example: {},
   },
   JsonView: {
@@ -149,11 +149,25 @@ export const customComponentDefinitions = {
       'Rich text written in GitHub-flavored Markdown: headings, **bold**, _italic_, lists, task lists, links, quotes, code, tables and images. Use it for prose and bullet points (e.g. slide content); use Text for a single value. Put live values in with { "$template": "Revenue is ${/queries/stats/data/revenue}" }. Raw HTML is shown as text.',
     example: { text: '- Revenue up **12%**\n- Churn down to 2%' },
   },
+  Svg: {
+    props: z.object({
+      name: z.string(),
+      alt: z.string().nullable(),
+      height: z.number().nullable(),
+    }),
+    slots: [],
+    description:
+      'An SVG image saved with create_svg, shown by its name: diagrams, illustrations, icons and logos (for charts of data use Chart). It is as wide as its container, keeping its aspect ratio; height in px sets the height instead (the width follows). alt describes it for screen readers; leave it out when the image is decorative. Theme colors in the SVG (currentColor, var(--foreground), var(--chart-1) …) follow the app theme.',
+    example: {
+      name: 'runtime-diagram',
+      alt: 'Agents call tools through Arcade',
+    },
+  },
   Slides: {
     props: z.object({}),
     slots: ['default'],
     description:
-      'A slideshow: shows one child at a time on a 16:9 canvas, with previous/next buttons, a slide counter, arrow-key navigation and a full-screen button for presenting. Each child is one slide, normally a Slide. Make it the root element of a presentation. Slides never scroll: the deck fits the window and the content of each slide is shrunk to fit it, so never put a ScrollArea in a deck. With "repeat" over an array and a single Slide child, it shows one slide per item.',
+      'A slideshow: shows one child at a time on a 16:9 canvas, with previous/next buttons, a slide counter, arrow-key navigation and a full-screen button for presenting. Each child is one slide, normally a Slide. Make it the root element of a presentation. Slides never scroll: the deck fills the space it is given and the content of each slide is shrunk to fit it, so never put a ScrollArea in a deck. With "repeat" over an array and a single Slide child, it shows one slide per item.',
     example: {},
   },
   Slide: {

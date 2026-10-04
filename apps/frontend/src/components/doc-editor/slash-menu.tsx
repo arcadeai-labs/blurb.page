@@ -9,17 +9,30 @@ import Suggestion, {
   type SuggestionKeyDownProps,
   type SuggestionProps,
 } from '@tiptap/suggestion'
-import { forwardRef, useImperativeHandle, useState } from 'react'
+import type { AppSummary } from '@template/api/ui'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import {
   Command,
   CommandEmpty,
+  CommandGroup,
   CommandItem,
   CommandList,
 } from '@/components/ui/command'
 import { newEmbedSource } from './ui-block'
 
+// Components come first: Markdown shortcuts (#, -, [ ]) cover the blocks too.
+const groups = ['Components', 'Blocks'] as const
+
 type SlashItem = {
+  id: string
   title: string
+  group: (typeof groups)[number]
   keywords: string[]
   run: (editor: Editor, range: Range) => void
 }
@@ -30,75 +43,117 @@ function block(run: (chain: ChainedCommands) => ChainedCommands) {
     run(editor.chain().focus().deleteRange(range)).run()
 }
 
-const items: SlashItem[] = [
+const blockItems: SlashItem[] = [
   {
+    id: 'Text',
     title: 'Text',
+    group: 'Blocks',
     keywords: ['paragraph', 'p'],
     run: block((chain) => chain.setParagraph()),
   },
   {
+    id: 'Heading 1',
     title: 'Heading 1',
+    group: 'Blocks',
     keywords: ['h1', 'title'],
     run: block((chain) => chain.setHeading({ level: 1 })),
   },
   {
+    id: 'Heading 2',
     title: 'Heading 2',
+    group: 'Blocks',
     keywords: ['h2', 'subtitle'],
     run: block((chain) => chain.setHeading({ level: 2 })),
   },
   {
+    id: 'Heading 3',
     title: 'Heading 3',
+    group: 'Blocks',
     keywords: ['h3'],
     run: block((chain) => chain.setHeading({ level: 3 })),
   },
   {
+    id: 'Bulleted list',
     title: 'Bulleted list',
+    group: 'Blocks',
     keywords: ['ul', 'unordered'],
     run: block((chain) => chain.toggleBulletList()),
   },
   {
+    id: 'Numbered list',
     title: 'Numbered list',
+    group: 'Blocks',
     keywords: ['ol', 'ordered'],
     run: block((chain) => chain.toggleOrderedList()),
   },
   {
+    id: 'To-do list',
     title: 'To-do list',
+    group: 'Blocks',
     keywords: ['task', 'checkbox', 'todo'],
     run: block((chain) => chain.toggleTaskList()),
   },
   {
+    id: 'Quote',
     title: 'Quote',
+    group: 'Blocks',
     keywords: ['blockquote'],
     run: block((chain) => chain.toggleBlockquote()),
   },
   {
+    id: 'Code',
     title: 'Code',
+    group: 'Blocks',
     keywords: ['codeblock', 'pre'],
     run: block((chain) => chain.toggleCodeBlock()),
   },
   {
+    id: 'Table',
     title: 'Table',
+    group: 'Blocks',
     keywords: ['grid'],
     run: block((chain) =>
       chain.insertTable({ rows: 3, cols: 3, withHeaderRow: true }),
     ),
   },
   {
+    id: 'Divider',
     title: 'Divider',
+    group: 'Blocks',
     keywords: ['hr', 'separator', 'rule'],
     run: block((chain) => chain.setHorizontalRule()),
   },
-  {
-    title: 'Component',
-    keywords: ['ui', 'embed', 'chart', 'table', 'app', 'json'],
+]
+
+/** Inserts a component to write as a json-render spec. */
+const newComponentItem: SlashItem = {
+  id: 'New component',
+  title: 'New component',
+  group: 'Components',
+  keywords: ['ui', 'embed', 'chart', 'table', 'json'],
+  run: block((chain) =>
+    chain.insertContent({
+      type: 'uiBlock',
+      attrs: { source: newEmbedSource },
+    }),
+  ),
+}
+
+/** Mounts a saved app, which stays up to date with it. */
+function appItem(app: AppSummary): SlashItem {
+  return {
+    id: `app:${app.name}`,
+    title: app.title,
+    group: 'Components',
+    keywords: [app.name, 'app'],
     run: block((chain) =>
       chain.insertContent({
         type: 'uiBlock',
-        attrs: { source: newEmbedSource },
+        attrs: { source: JSON.stringify({ app: app.name }, null, 2) },
       }),
     ),
-  },
-]
+  }
+}
 
 function matches(item: SlashItem, query: string) {
   const search = query.toLowerCase()
@@ -116,6 +171,18 @@ const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(
   function SlashMenu({ items: found, command }, ref) {
     const [selected, setSelected] = useState(0)
     const index = Math.min(selected, found.length - 1)
+    const list = useRef<HTMLDivElement>(null)
+
+    const selectedId = found[index]?.id
+
+    // The editor keeps focus, so arrow keys don't scroll the list themselves.
+    useEffect(() => {
+      if (selectedId === undefined) return
+
+      list.current
+        ?.querySelector(`[cmdk-item][data-value="${CSS.escape(selectedId)}"]`)
+        ?.scrollIntoView({ block: 'nearest' })
+    }, [selectedId])
 
     useImperativeHandle(ref, () => ({
       onKeyDown: ({ event }) => {
@@ -139,39 +206,67 @@ const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(
     return (
       <Command
         shouldFilter={false}
-        value={found[index]?.title ?? ''}
-        onValueChange={(title) =>
-          setSelected(found.findIndex((item) => item.title === title))
+        value={selectedId ?? ''}
+        onValueChange={(id) =>
+          setSelected(found.findIndex((item) => item.id === id))
         }
         className="w-56 border shadow-md"
       >
-        <CommandList>
+        <CommandList ref={list}>
           <CommandEmpty>No results</CommandEmpty>
-          {found.map((item) => (
-            <CommandItem
-              key={item.title}
-              value={item.title}
-              onSelect={() => command(item)}
-            >
-              {item.title}
-            </CommandItem>
-          ))}
+          {groups.map((group) => {
+            const inGroup = found.filter((item) => item.group === group)
+
+            return inGroup.length > 0 ? (
+              <CommandGroup key={group} heading={group}>
+                {inGroup.map((item) => (
+                  <CommandItem
+                    key={item.id}
+                    value={item.id}
+                    onSelect={() => command(item)}
+                  >
+                    {item.title}
+                  </CommandItem>
+                ))}
+              </CommandGroup>
+            ) : null
+          })}
         </CommandList>
       </Command>
     )
   },
 )
 
-/** Type `/` to turn a block into a heading, list, table, component… */
-export const SlashCommands = Extension.create({
+/**
+ * Type `/` to add a component (a new one, or one of the saved apps listed by
+ * `apps`, mounted), or to turn a block into a heading, list, table…
+ */
+export const SlashCommands = Extension.create<{
+  apps: () => Promise<AppSummary[]>
+}>({
   name: 'slashCommands',
 
+  addOptions() {
+    return { apps: async () => [] }
+  },
+
   addProseMirrorPlugins() {
+    const { apps } = this.options
+
     return [
       Suggestion<SlashItem, SlashItem>({
         editor: this.editor,
         char: '/',
-        items: ({ query }) => items.filter((item) => matches(item, query)),
+        items: async ({ query }) => {
+          // Without the apps (e.g. offline), the blocks still work.
+          const saved = await apps().catch(() => [])
+
+          return [
+            newComponentItem,
+            ...saved.map(appItem),
+            ...blockItems,
+          ].filter((item) => matches(item, query))
+        },
         command: ({ editor, range, props }) => props.run(editor, range),
         render: () => {
           let menu: ReactRenderer<SlashMenuHandle, SlashMenuProps> | undefined
