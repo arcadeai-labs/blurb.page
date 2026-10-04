@@ -8,22 +8,12 @@ export class McpUnavailableError extends Error {
   name = 'McpUnavailableError'
 }
 
-/** Gateway auth headers (`Authorization` + `Arcade-User-ID`), when configured. */
-function mcpHeaders() {
-  const headers: Record<string, string> = {}
-
-  if (process.env.ARCADE_API_KEY) {
-    headers.Authorization = `Bearer ${process.env.ARCADE_API_KEY}`
-  }
-  if (process.env.ARCADE_USER_ID) {
-    headers['Arcade-User-ID'] = process.env.ARCADE_USER_ID
-  }
-
-  return headers
-}
-
-/** Connects to the MCP server at `MCP_URL` for the duration of `fn`. */
+/**
+ * Connects to the MCP server at `MCP_URL` for the duration of `fn`, as the
+ * user whose Arcade access token is `accessToken`.
+ */
 export async function withMcpClient<T>(
+  accessToken: string,
   fn: (client: Client) => Promise<T>,
 ): Promise<T> {
   const url = process.env.MCP_URL
@@ -37,7 +27,7 @@ export async function withMcpClient<T>(
   try {
     await client.connect(
       new StreamableHTTPClientTransport(new URL(url), {
-        requestInit: { headers: mcpHeaders() },
+        requestInit: { headers: { Authorization: `Bearer ${accessToken}` } },
       }),
     )
   } catch (error) {

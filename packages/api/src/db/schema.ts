@@ -41,3 +41,15 @@ export const apps = pgTable('apps', {
 })
 
 export type App = typeof apps.$inferSelect
+
+/**
+ * Clients registered with Arcade's OAuth server for local origins, which
+ * can't serve a client metadata document Arcade can fetch (see `auth/arcade`).
+ */
+export const arcadeClients = pgTable('arcade_clients', {
+  origin: text('origin').primaryKey(),
+  clientId: text('client_id').notNull(),
+  ...timestamps,
+})
+
+export * from './auth-schema'

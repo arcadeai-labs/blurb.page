@@ -22,14 +22,20 @@
     "db:local": "pglite-server --db=.pglite --port=5433 --max-connections=10"
   },
   "dependencies": {
+    "@better-auth/core": "1.7.7",
+    "@better-auth/mcp": "^1.7.7",
+    "@better-auth/utils": "0.4.2",
     "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-openapi": "^1.4.0",
     "@json-render/core": "^0.21.0",
     "@json-render/react": "^0.21.0",
     "@json-render/shadcn": "^0.21.0",
     "@modelcontextprotocol/sdk": "^1.32.0",
+    "better-auth": "^1.7.7",
+    "better-call": "1.4.0",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.12.23",
+    "jose": "^6.2.12",
     "postgres": "^3.4.9",
     "run": "^2.1.7",
     "zod": "^4.4.3"

@@ -9,14 +9,27 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthedRouteImport } from './routes/_authed'
+import { Route as ConsentRouteImport } from './routes/consent'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as McpRouteImport } from './routes/mcp'
+import { Route as DotwellKnownSplatRouteImport } from './routes/[.]well-known/$'
+import { Route as AuthedIndexRouteImport } from './routes/_authed/index'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
-import { Route as AppsNameRouteImport } from './routes/apps.$name'
+import { Route as AuthedAppsNameRouteImport } from './routes/_authed/apps.$name'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const AuthedRoute = AuthedRouteImport.update({
+  id: '/_authed',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ConsentRoute = ConsentRouteImport.update({
+  id: '/consent',
+  path: '/consent',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const McpRoute = McpRouteImport.update({
@@ -24,58 +37,117 @@ const McpRoute = McpRouteImport.update({
   path: '/mcp',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DotwellKnownSplatRoute = DotwellKnownSplatRouteImport.update({
+  id: '/.well-known/$',
+  path: '/.well-known/$',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthedIndexRoute = AuthedIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AuthedRoute,
+} as any)
 const ApiSplatRoute = ApiSplatRouteImport.update({
   id: '/api/$',
   path: '/api/$',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppsNameRoute = AppsNameRouteImport.update({
+const AuthedAppsNameRoute = AuthedAppsNameRouteImport.update({
   id: '/apps/$name',
   path: '/apps/$name',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => AuthedRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof AuthedIndexRoute
+  '/consent': typeof ConsentRoute
+  '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
-  '/apps/$name': typeof AppsNameRoute
+  '/apps/$name': typeof AuthedAppsNameRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/consent': typeof ConsentRoute
+  '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
-  '/apps/$name': typeof AppsNameRoute
+  '/': typeof AuthedIndexRoute
+  '/apps/$name': typeof AuthedAppsNameRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_authed': typeof AuthedRouteWithChildren
+  '/consent': typeof ConsentRoute
+  '/login': typeof LoginRoute
   '/mcp': typeof McpRoute
+  '/.well-known/$': typeof DotwellKnownSplatRoute
   '/api/$': typeof ApiSplatRoute
-  '/apps/$name': typeof AppsNameRoute
+  '/_authed/': typeof AuthedIndexRoute
+  '/_authed/apps/$name': typeof AuthedAppsNameRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/mcp' | '/api/$' | '/apps/$name'
+  fullPaths:
+    | '/'
+    | '/consent'
+    | '/login'
+    | '/mcp'
+    | '/.well-known/$'
+    | '/api/$'
+    | '/apps/$name'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/mcp' | '/api/$' | '/apps/$name'
-  id: '__root__' | '/' | '/mcp' | '/api/$' | '/apps/$name'
+  to:
+    | '/consent'
+    | '/login'
+    | '/mcp'
+    | '/.well-known/$'
+    | '/api/$'
+    | '/'
+    | '/apps/$name'
+  id:
+    | '__root__'
+    | '/_authed'
+    | '/consent'
+    | '/login'
+    | '/mcp'
+    | '/.well-known/$'
+    | '/api/$'
+    | '/_authed/'
+    | '/_authed/apps/$name'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  AuthedRoute: typeof AuthedRouteWithChildren
+  ConsentRoute: typeof ConsentRoute
+  LoginRoute: typeof LoginRoute
   McpRoute: typeof McpRoute
+  DotwellKnownSplatRoute: typeof DotwellKnownSplatRoute
   ApiSplatRoute: typeof ApiSplatRoute
-  AppsNameRoute: typeof AppsNameRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
+    '/_authed': {
+      id: '/_authed'
+      path: ''
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+      preLoaderRoute: typeof AuthedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/consent': {
+      id: '/consent'
+      path: '/consent'
+      fullPath: '/consent'
+      preLoaderRoute: typeof ConsentRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/mcp': {
@@ -85,6 +157,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof McpRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/.well-known/$': {
+      id: '/.well-known/$'
+      path: '/.well-known/$'
+      fullPath: '/.well-known/$'
+      preLoaderRoute: typeof DotwellKnownSplatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authed/': {
+      id: '/_authed/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AuthedIndexRouteImport
+      parentRoute: typeof AuthedRoute
+    }
     '/api/$': {
       id: '/api/$'
       path: '/api/$'
@@ -92,21 +178,36 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSplatRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/apps/$name': {
-      id: '/apps/$name'
+    '/_authed/apps/$name': {
+      id: '/_authed/apps/$name'
       path: '/apps/$name'
       fullPath: '/apps/$name'
-      preLoaderRoute: typeof AppsNameRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof AuthedAppsNameRouteImport
+      parentRoute: typeof AuthedRoute
     }
   }
 }
 
+interface AuthedRouteChildren {
+  AuthedIndexRoute: typeof AuthedIndexRoute
+  AuthedAppsNameRoute: typeof AuthedAppsNameRoute
+}
+
+const AuthedRouteChildren: AuthedRouteChildren = {
+  AuthedIndexRoute: AuthedIndexRoute,
+  AuthedAppsNameRoute: AuthedAppsNameRoute,
+}
+
+const AuthedRouteWithChildren =
+  AuthedRoute._addFileChildren(AuthedRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  AuthedRoute: AuthedRouteWithChildren,
+  ConsentRoute: ConsentRoute,
+  LoginRoute: LoginRoute,
   McpRoute: McpRoute,
+  DotwellKnownSplatRoute: DotwellKnownSplatRoute,
   ApiSplatRoute: ApiSplatRoute,
-  AppsNameRoute: AppsNameRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

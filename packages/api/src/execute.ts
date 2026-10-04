@@ -12,13 +12,15 @@ export type ExecuteResult =
 
 /**
  * Runs a script in the QuickJS sandbox with `input` as a global and the MCP
- * server's tools available as `tools.*`. Invalid input and guest failures
+ * server's tools available as `tools.*`, called as the user whose Arcade
+ * access token is `accessToken`. Invalid input and guest failures
  * come back as `ok: false`, not as exceptions. A failed run whose tool call
  * needed authorization is reported as `AUTHORIZATION_REQUIRED`, even if the
  * script caught and rethrew the tool's error.
  */
 export async function executeScript(
   script: { source: string; inputSchema: Record<string, unknown> },
+  accessToken: string,
   input: unknown = {},
   abortSignal?: AbortSignal,
 ): Promise<ExecuteResult> {
@@ -34,7 +36,7 @@ export async function executeScript(
   // JSON is a valid JS expression, so the input is inlined as a constant.
   const source = `const input = ${JSON.stringify(parsed.data ?? null)};\n${script.source}`
 
-  return withMcpClient(async (client) => {
+  return withMcpClient(accessToken, async (client) => {
     let authorization: { toolName: string; url: string } | undefined
 
     try {

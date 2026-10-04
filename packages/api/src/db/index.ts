@@ -7,9 +7,16 @@ import * as schema from './schema'
 export const localDatabaseUrl =
   'postgres://postgres:postgres@127.0.0.1:5433/postgres'
 
-/** Creates a Drizzle client for any Postgres URL. */
+/**
+ * Creates a Drizzle client for any Postgres URL. PGlite serves every
+ * connection from one session, so concurrent queries on several connections
+ * interleave and fail; a database on this machine gets a single connection.
+ */
 export function createDb(url: string) {
-  return drizzle(postgres(url), { schema })
+  const { hostname } = new URL(url)
+  const local = ['127.0.0.1', 'localhost', '[::1]'].includes(hostname)
+
+  return drizzle(postgres(url, local ? { max: 1 } : {}), { schema })
 }
 
 export type Db = ReturnType<typeof createDb>

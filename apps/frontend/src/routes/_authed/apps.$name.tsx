@@ -6,7 +6,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getApp } from '@/lib/mcp'
 
-export const Route = createFileRoute('/apps/$name')({
+export const Route = createFileRoute('/_authed/apps/$name')({
   component: AppPage,
 })
 

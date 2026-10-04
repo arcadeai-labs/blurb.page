@@ -11,6 +11,7 @@ import {
   toAppJson,
   toAppSummary,
 } from './apps'
+import { arcadeAccessToken, SignInRequiredError, withMcpUser } from './auth'
 import { getDb } from './db'
 import { isUniqueViolation } from './db/errors'
 import { apps, type Script, scripts } from './db/schema'
@@ -63,12 +64,18 @@ function invalidApp(errors: string[]) {
   )
 }
 
-/** Reports an unreachable upstream MCP server as a tool error. */
+/**
+ * Reports an unreachable upstream MCP server, or an Arcade session that has
+ * to be renewed, as a tool error.
+ */
 async function upstream(fn: () => Promise<CallToolResult>) {
   try {
     return await fn()
   } catch (error) {
-    if (error instanceof McpUnavailableError) {
+    if (
+      error instanceof McpUnavailableError ||
+      error instanceof SignInRequiredError
+    ) {
       return fail(error.message)
     }
     throw error
@@ -141,9 +148,9 @@ Fit the window: the page shouldn't scroll. Put anything that grows with data (ta
 
 /**
  * The API's operations, exposed as MCP tools. `baseUrl` is where apps are
- * rendered.
+ * rendered, and `arcadeToken` gets the user's token for the upstream server.
  */
-function createMcpServer(baseUrl: string) {
+function createMcpServer(baseUrl: string, arcadeToken: () => Promise<string>) {
   const server = new McpServer(
     { name: 'every-ui', version: '0.0.0' },
     { instructions: instructions(baseUrl) },
@@ -182,7 +189,9 @@ function createMcpServer(baseUrl: string) {
     },
     () =>
       upstream(async () => {
-        const { tools } = await withMcpClient((client) => client.listTools())
+        const { tools } = await withMcpClient(await arcadeToken(), (client) =>
+          client.listTools(),
+        )
 
         return ok({
           tools: tools.map((tool) => ({
@@ -331,7 +340,12 @@ function createMcpServer(baseUrl: string) {
       }
 
       return upstream(async () => {
-        const result = await executeScript(script, args.input, extra.signal)
+        const result = await executeScript(
+          script,
+          await arcadeToken(),
+          args.input,
+          extra.signal,
+        )
 
         return result.ok
           ? ok({ value: result.value })
@@ -458,8 +472,9 @@ function createMcpServer(baseUrl: string) {
 }
 
 /**
- * Handles a Streamable HTTP MCP request. Stateless: every request gets a fresh
- * server and transport, so nothing has to be kept between requests.
+ * Handles a Streamable HTTP MCP request, as the signed-in user or the user who
+ * authorized the client. Stateless: every request gets a fresh server and
+ * transport, so nothing has to be kept between requests.
  */
 export async function handleMcpRequest(request: Request) {
   // A stateless server never pushes messages, so it offers no standalone SSE
@@ -468,13 +483,17 @@ export async function handleMcpRequest(request: Request) {
     return new Response(null, { status: 405, headers: { Allow: 'POST' } })
   }
 
-  const server = createMcpServer(frontendUrl(request))
-  const transport = new WebStandardStreamableHTTPServerTransport({
-    sessionIdGenerator: undefined,
-    enableJsonResponse: true,
+  return withMcpUser(request, async (auth, userId) => {
+    const server = createMcpServer(frontendUrl(request), () =>
+      arcadeAccessToken(auth, userId),
+    )
+    const transport = new WebStandardStreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
+    })
+
+    await server.connect(transport)
+
+    return transport.handleRequest(request)
   })
-
-  await server.connect(transport)
-
-  return transport.handleRequest(request)
 }

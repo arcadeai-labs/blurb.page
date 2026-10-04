@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { desc, eq } from 'drizzle-orm'
 
+import type { AuthEnv } from '../auth/routes'
 import { getDb } from '../db'
 import { isUniqueViolation } from '../db/errors'
 import { type Script, scripts } from '../db/schema'
@@ -143,7 +144,7 @@ async function findScript(id: string) {
   return script
 }
 
-export const scriptsRoutes = new OpenAPIHono()
+export const scriptsRoutes = new OpenAPIHono<AuthEnv>()
   .openapi(listRoute, async (c) => {
     const rows = await getDb()
       .select()
@@ -219,6 +220,7 @@ export const scriptsRoutes = new OpenAPIHono()
       return c.json(
         await executeScript(
           script,
+          await c.var.arcadeToken(),
           // Without a body this is `{}`, so the script runs with input `{}`.
           c.req.valid('json').input,
           c.req.raw.signal,
