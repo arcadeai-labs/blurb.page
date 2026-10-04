@@ -33,7 +33,8 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { toast } from '@/components/ui/toast'
-import { executeScript } from '@/lib/mcp'
+import { AuthorizationRequiredError, executeScript } from '@/lib/mcp'
+import { toastScriptError } from './authorization'
 import {
   AppQueriesProvider,
   initialAppState,
@@ -119,11 +120,7 @@ function createHandlers({
         const message = error instanceof Error ? error.message : String(error)
 
         settle({ status: 'error', data: null, error: message })
-        toast.add({
-          title: `${name} failed`,
-          description: message,
-          type: 'error',
-        })
+        toastScriptError(`${name} failed`, error)
         throw new ActionStoppedError(message, { cause: error })
       }
 
@@ -156,14 +153,11 @@ function createHandlers({
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
 
-        if (errorPath) {
-          store.set(errorPath, message)
-        } else {
-          toast.add({
-            title: `${script} failed`,
-            description: message,
-            type: 'error',
-          })
+        if (errorPath) store.set(errorPath, message)
+
+        // An errorPath can't show the Authorize link, so those always toast.
+        if (!errorPath || error instanceof AuthorizationRequiredError) {
+          toastScriptError(`${script} failed`, error)
         }
         throw new ActionStoppedError(message, { cause: error })
       } finally {

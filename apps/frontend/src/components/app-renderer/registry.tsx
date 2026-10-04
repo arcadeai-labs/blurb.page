@@ -11,6 +11,7 @@ import {
   Query,
   RowTable,
   RowTableRow,
+  ScrollArea,
 } from './components'
 import { Markdown } from './markdown'
 import { Slide, Slides } from './slides'
@@ -44,6 +45,7 @@ export const { registry } = defineRegistry(componentCatalog, {
     Query,
     RowTable,
     RowTableRow,
+    ScrollArea,
     Slide,
     Slides,
   },

@@ -16,6 +16,7 @@ import { isUniqueViolation } from './db/errors'
 import { apps, type Script, scripts } from './db/schema'
 import { executeScript } from './execute'
 import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
+import type { ScriptError } from './script-error'
 import { scriptFields, scriptName } from './script-fields'
 import { appFields, appName } from './ui/app'
 import { appGuide } from './ui/guide'
@@ -38,6 +39,18 @@ function ok(value: Record<string, unknown>): CallToolResult {
 
 function fail(message: string): CallToolResult {
   return { content: [{ type: 'text', text: message }], isError: true }
+}
+
+/**
+ * Reports a failed script run, with the error as structured content too so
+ * clients can tell an authorization prompt from other failures.
+ */
+function scriptFailed(error: ScriptError): CallToolResult {
+  const text = error.authorizationUrl
+    ? `${error.code}: ${error.message} Show the user this link to authorize, then retry: ${error.authorizationUrl}`
+    : `${error.code}: ${error.message}`
+
+  return { ...fail(text), structuredContent: { error } }
 }
 
 const scriptNotFound = () => fail('Script not found')
@@ -121,7 +134,9 @@ function instructions(baseUrl: string) {
 
 Before creating or changing an app, call get_app_guide once: it documents the spec format, every component and action, and patterns for loading data, forms, tables, charts and row actions. Typical flow: list_script_tools → create_script (one per data operation; test with execute_script) → create_app → share the returned url. Use the list_/get_/update_/delete_ tools to change existing scripts and apps.
 
-Less is more: build only what the user asked for, with the fewest elements that do it. No headings, intro text or other filler (the navbar already shows the app's title and description), and no features nobody asked for.`
+Less is more: build only what the user asked for, with the fewest elements that do it. No headings, intro text or other filler (the navbar already shows the app's title and description), and no features nobody asked for.
+
+Fit the window: the page shouldn't scroll. Put anything that grows with data (tables, lists, message bodies) in a ScrollArea so it scrolls on its own; side-by-side panes each get a ScrollArea that fills the window.`
 }
 
 /**
@@ -291,7 +306,7 @@ function createMcpServer(baseUrl: string) {
     'execute_script',
     {
       description:
-        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the upstream MCP server (`MCP_URL`) is available to it as `tools.<functionName>(args)`. Returns `{ value }`.',
+        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the upstream MCP server (`MCP_URL`) is available to it as `tools.<functionName>(args)`. Returns `{ value }`. If a tool needs the user to authorize it first, it fails with AUTHORIZATION_REQUIRED and a link to show the user.',
       inputSchema: {
         id: scriptId.optional(),
         name: scriptName.optional(),
@@ -320,7 +335,7 @@ function createMcpServer(baseUrl: string) {
 
         return result.ok
           ? ok({ value: result.value })
-          : fail(`${result.error.code}: ${result.error.message}`)
+          : scriptFailed(result.error)
       })
     },
   )

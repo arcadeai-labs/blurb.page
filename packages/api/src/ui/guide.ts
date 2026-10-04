@@ -108,7 +108,12 @@ export const exampleApp: {
       issues: {
         type: 'Query',
         props: { query: 'issues' },
-        children: ['issue-table', 'no-issues'],
+        children: ['issue-scroll', 'no-issues'],
+      },
+      'issue-scroll': {
+        type: 'ScrollArea',
+        props: { height: 400 },
+        children: ['issue-table'],
       },
       'issue-table': {
         type: 'RowTable',
@@ -339,6 +344,16 @@ Build exactly what the user asked for, with the fewest elements that do it well.
 - Short labels (a word or two) for titles, columns, buttons and fields. Leave optional props like description, caption and placeholder out unless they say something new.
 - Flat layouts: one Stack of sections. Wrap a section in a Card only when the page has several; skip Tabs, Accordions and Dialogs unless the content needs them.
 
+## Fit the window
+
+An app should fit in the browser window like a desktop app: the page itself shouldn't scroll, its long parts should. Anything that grows with data (tables, lists, repeated items, message or document bodies, logs, JsonView) goes in a ScrollArea, which scrolls on its own instead of stretching the page.
+
+- Wrap only the long part, inside its Card and Query: keep a Card's title, toolbar and buttons outside the ScrollArea so they stay put.
+- Side-by-side panes (list and detail, inbox and message): a Grid of panes, each with a ScrollArea without a height. Both fill the window down to the bottom and scroll independently.
+- A ScrollArea without a height must be the last thing in its pane: put actions and forms (e.g. a reply box) above it, or give it a height.
+- Elsewhere (a table under a form, a list in a Dialog, a long Card among others) give the ScrollArea a height in px, around 300–500.
+- Keep what sits above the panes short (a toolbar, a row of Metrics) so they get most of the window.
+
 ## Workflow
 
 1. list_script_tools — the integration tools scripts can call (and their input schemas).
@@ -352,6 +367,7 @@ A script's source is the body of an async JavaScript function, run in a sandbox 
 
 - \`input\` is a global holding the call's input, validated against the script's inputSchema first.
 - Every integration tool is \`await tools.<functionName>(args)\` (functionName from list_script_tools). Tool results come back as structured JSON when available, otherwise parsed JSON text, otherwise a string. A tool error throws.
+- When the user hasn't authorized an integration yet, its tools throw and the run fails with AUTHORIZATION_REQUIRED and an authorizationUrl. Apps prompt the user to authorize and then retry, so let that error propagate: don't catch it or return a fallback value. When execute_script returns it, show the user the link and retry once they've authorized.
 - \`return\` the output. It must be JSON-serializable; outputSchema documents its shape.
 - Shape the output for the UI: flat arrays of objects with an \`id\` for tables and lists, pre-aggregated arrays for charts (e.g. [{ "month": "Jan", "revenue": 10 }]), plain objects for metrics. Do formatting and joins in the script, not the spec.
 - Scripts are referenced by name from apps, so names are unique slugs.
@@ -403,7 +419,7 @@ Queries:
 - Run when the app opens, and again whenever a { "$state": "/path" } in their input changes. There is no need to reload them by hand.
 - Their state is at /queries/<name>: { status: "pending" | "success" | "error" | "idle", data, error, isFetching }.
 - Read the result with { "$state": "/queries/<name>/data" } (or a path inside it), repeat over it, or pass it to DataTable, Chart or Metric.
-- Anything that reads /queries/<name>/data must be inside a Query element for that query: { "type": "Query", "props": { "query": "<name>" }, "children": [...] }. It shows a skeleton while loading and an error with a retry button on failure, and renders its children once data is in. Put a Query around each section that needs the data.
+- Anything that reads /queries/<name>/data must be inside a Query element for that query: { "type": "Query", "props": { "query": "<name>" }, "children": [...] }. It shows a skeleton while loading, an error with a retry button on failure (with an Authorize button when an integration needs authorization), and renders its children once data is in. Put a Query around each section that needs the data.
 - "enabled": a condition (same syntax as visible) that must hold for the query to run, e.g. { "$state": "/selected" } for a detail query. While disabled the status is "idle" and the Query element renders nothing.
 - "refetchInterval": poll every this many milliseconds (at least 1000).
 - Inputs can only use { "$state": "/path" } expressions, including other queries' data for dependent queries.
@@ -429,7 +445,7 @@ Mutations:
 - Empty states: inside the Query, a Text with visible: { "$state": "/queries/items/data/0", "not": true }.
 - Forms: bind inputs with { "$bindState": "/form/<field>" }, add checks for validation, and submit with a Button whose on.press is [mutate with "validate": true, setState to reset /form, toast]. The mutation's input is { "$state": "/form" } and it invalidates the list query.
 - Row actions: RowTable with "repeat": { "statePath": "/queries/items/data", "key": "id" } and a RowTableRow child; buttons in the row run mutate with "input": { "id": { "$item": "id" } }.
-- Master/detail: DataTable with "selected": { "$bindState": "/selected" }, and a detail query with "input": { "id": { "$state": "/selected/id" } } and "enabled": { "$state": "/selected" }, shown in its own Query element.
+- Master/detail: DataTable with "selected": { "$bindState": "/selected" }, and a detail query with "input": { "id": { "$state": "/selected/id" } } and "enabled": { "$state": "/selected" }, shown in its own Query element. Lay them out as side-by-side panes, each with its long content in a ScrollArea without a height (see Fit the window).
 - Filters and search: bind a Select/Input to /filter and use { "$state": "/filter" } in the query input; the query refetches when it changes.
 - Edit dialogs: DataTable with "selected": { "$bindState": "/selected" } and on.select running setState { "statePath": "/editing", "value": true }; a Dialog with openPath "/editing" holds inputs bound to /selected/<field> (edits change /selected, not the query data); Save runs mutate with "input": { "$state": "/selected" }, then setState /editing false.
 - Note: a top-level { "$item": "field" } action param resolves to the item's state path, not its value; nest it (e.g. "input": { "id": { "$item": "id" } }) to pass the value.

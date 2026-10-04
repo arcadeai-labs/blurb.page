@@ -17,7 +17,7 @@ import {
   useQuery,
 } from '@tanstack/react-query'
 import { createContext, useContext, useEffect } from 'react'
-import { executeScript } from '@/lib/mcp'
+import { AuthorizationRequiredError, executeScript } from '@/lib/mcp'
 
 /**
  * Query key for a script's result. Queries share results by script and input,
@@ -58,12 +58,14 @@ export function initialAppState(spec: AppSpec, queryClient: QueryClient) {
               status: 'success',
               data: cached.data ?? null,
               error: null,
+              authorizationUrl: null,
               isFetching: false,
             }
           : {
               status: enabled ? 'pending' : 'idle',
               data: null,
               error: null,
+              authorizationUrl: null,
               isFetching: enabled,
             }
 
@@ -98,8 +100,11 @@ function QueryRunner({
     queryFn: () => executeScript(query.script, input),
     enabled,
     refetchInterval: query.refetchInterval ?? false,
-    // Script failures are usually deterministic, so retry only once.
-    retry: 1,
+    // Script failures are usually deterministic, so retry only once, and
+    // not at all until the user authorizes. Coming back to the tab after
+    // authorizing refetches it.
+    retry: (failureCount, error) =>
+      failureCount < 1 && !(error instanceof AuthorizationRequiredError),
     // Keep showing the previous rows while a changed input loads.
     placeholderData: keepPreviousData,
   })
@@ -109,6 +114,10 @@ function QueryRunner({
     !enabled && result.isPending ? 'idle' : result.status
   const data = result.data ?? null
   const error = result.error?.message ?? null
+  const authorizationUrl =
+    result.error instanceof AuthorizationRequiredError
+      ? result.error.authorizationUrl
+      : null
   const { isFetching } = result
 
   useEffect(() => {
@@ -116,9 +125,10 @@ function QueryRunner({
       status,
       data,
       error,
+      authorizationUrl,
       isFetching,
     } satisfies QueryState)
-  }, [store, name, status, data, error, isFetching])
+  }, [store, name, status, data, error, authorizationUrl, isFetching])
 
   return null
 }

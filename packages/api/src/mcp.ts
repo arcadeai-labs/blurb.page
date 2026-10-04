@@ -1,6 +1,7 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { type HostFunctionGroup, RunHostFunctionError } from 'run'
+import { z } from 'zod'
 
 /** `MCP_URL` is missing, or the MCP server couldn't be reached. */
 export class McpUnavailableError extends Error {
@@ -68,11 +69,28 @@ function textOf(content: ToolContent[]) {
     .join('\n')
 }
 
+/** The tool error Arcade returns when the user hasn't authorized the tool. */
+const authorizationResponse = z.object({ authorization_url: z.url() })
+
+/** The authorization URL in a tool error, when it needs authorization. */
+function authorizationUrlOf(text: string) {
+  try {
+    const parsed = authorizationResponse.safeParse(JSON.parse(text))
+    return parsed.success ? parsed.data.authorization_url : undefined
+  } catch {
+    return undefined
+  }
+}
+
 /**
  * Prefers structured output, then JSON-looking text, then plain text, so
  * scripts get plain values back instead of MCP content envelopes.
  */
-function toolResultValue(result: Awaited<ReturnType<Client['callTool']>>) {
+function toolResultValue(
+  toolName: string,
+  result: Awaited<ReturnType<Client['callTool']>>,
+  onAuthorizationRequired: (toolName: string, url: string) => void,
+) {
   if (!('content' in result)) {
     return result.toolResult
   }
@@ -81,7 +99,13 @@ function toolResultValue(result: Awaited<ReturnType<Client['callTool']>>) {
   const text = textOf(content)
 
   if (result.isError) {
+    const authorizationUrl = authorizationUrlOf(text)
+
     // `run` hides plain host errors from scripts; a RunError keeps its message.
+    if (authorizationUrl) {
+      onAuthorizationRequired(toolName, authorizationUrl)
+      throw new RunHostFunctionError(`${toolName} requires authorization`)
+    }
     throw new RunHostFunctionError(text || 'Tool call failed')
   }
   if (result.structuredContent !== undefined) {
@@ -95,9 +119,14 @@ function toolResultValue(result: Awaited<ReturnType<Client['callTool']>>) {
   }
 }
 
-/** Exposes every tool on the MCP server as `tools.<functionName>(args)`. */
+/**
+ * Exposes every tool on the MCP server as `tools.<functionName>(args)`. A tool
+ * that needs authorization throws, and its URL goes to `onAuthorizationRequired`
+ * (`run` doesn't pass error details through the sandbox).
+ */
 export async function mcpHostFunctions(
   client: Client,
+  onAuthorizationRequired: (toolName: string, url: string) => void,
 ): Promise<HostFunctionGroup> {
   const { tools } = await client.listTools()
   const functions: HostFunctionGroup = {}
@@ -107,7 +136,9 @@ export async function mcpHostFunctions(
       args: Record<string, unknown> = {},
     ) =>
       toolResultValue(
+        tool.name,
         await client.callTool({ name: tool.name, arguments: args }),
+        onAuthorizationRequired,
       )
   }
 
