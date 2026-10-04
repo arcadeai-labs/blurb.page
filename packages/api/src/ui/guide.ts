@@ -258,6 +258,16 @@ export function appGuide(frontendUrl: string) {
 
 An app is a web UI described as JSON (a json-render spec) and rendered with shadcn/ui components at ${frontendUrl}/apps/<name>. Apps read and change real data by running scripts: server-side JavaScript that calls integration tools. The browser runs scripts through this MCP server (execute_script), so anything an app does, you can do and test yourself with the same tools.
 
+## Less is more
+
+Build exactly what the user asked for, with the fewest elements that do it well. A small app that does one thing clearly beats a big one that does everything.
+
+- No page heading, intro or tagline: the navbar already shows the app's title and description, so the spec starts with the content itself.
+- No filler: no welcome text, instructions that restate the UI, descriptions that repeat a label, decorative Separators or placeholder sections.
+- No features nobody asked for: no extra metrics, charts, filters, tabs or forms "for completeness". Asked for a list? Show a table. Add more when the user asks.
+- Short labels (a word or two) for titles, columns, buttons and fields. Leave optional props like description, caption and placeholder out unless they say something new.
+- Flat layouts: one Stack of sections. Wrap a section in a Card only when the page has several; skip Tabs, Accordions and Dialogs unless the content needs them.
+
 ## Workflow
 
 1. list_script_tools — the integration tools scripts can call (and their input schemas).
@@ -289,8 +299,8 @@ An app is \`{ name, title, description, spec }\`. The spec is a single JSON obje
 {
   "root": "page",
   "elements": {
-    "page": { "type": "Stack", "props": { "direction": "vertical", "gap": "lg" }, "children": ["title"] },
-    "title": { "type": "Heading", "props": { "text": "Hello" }, "children": [] }
+    "page": { "type": "Stack", "props": { "direction": "vertical", "gap": "lg" }, "children": ["greeting"] },
+    "greeting": { "type": "Text", "props": { "text": "Hello" }, "children": [] }
   },
   "state": { },
   "queries": { },
@@ -301,7 +311,7 @@ An app is \`{ name, title, description, spec }\`. The spec is a single JSON obje
 - elements is a flat map of key → { type, props, children, visible?, repeat?, on?, watch?, slots? }. Every element needs a children array ([] for leaves) and every child key must exist.
 - type must be a component listed below and props must match its props. Optional props can be omitted.
 - state is the initial state model for what the user edits: form fields, filters, selections, tabs. Seed every path the UI binds ("" for inputs, false for flags). Do not put script results or sample data in it: data comes from queries.
-- The page already shows the app title and description as a heading, so start the spec with content.
+- The navbar shows the app title and description, so don't repeat them in the spec: start with content.
 
 ## Queries and mutations
 
@@ -356,7 +366,7 @@ Mutations:
 
 ## Complete example
 
-A create_app call for an issue tracker. It assumes scripts named list-issues (input { state }, returns [{ id, title, state, labelText }]), issue-stats (returns { open, closed, byLabel: [{ label, open, closed }] }), create-issue (input { title, body }) and close-issue (input { id }).
+A create_app call for an issue tracker. It shows many features at once for reference; a real app should only have the parts the user asked for. It assumes scripts named list-issues (input { state }, returns [{ id, title, state, labelText }]), issue-stats (returns { open, closed, byLabel: [{ label, open, closed }] }), create-issue (input { title, body }) and close-issue (input { id }).
 
 \`\`\`json
 ${JSON.stringify(exampleApp, null, 2)}

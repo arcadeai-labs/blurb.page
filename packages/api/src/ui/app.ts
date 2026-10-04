@@ -189,8 +189,14 @@ export const onLoadSchema = z
 /** Fields accepted when creating an app; updates take any subset. */
 export const appFields = {
   name: appName,
-  title: z.string().trim().min(1).describe('Shown as the page heading'),
-  description: z.string().describe('What the app is for'),
+  title: z
+    .string()
+    .trim()
+    .min(1)
+    .describe('A few words, shown in the navbar as the page title'),
+  description: z
+    .string()
+    .describe('One short line on what the app is for, shown under the title'),
   spec: specSchema,
   onLoad: onLoadSchema.optional(),
 }

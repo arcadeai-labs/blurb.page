@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
 import { useEffect, useState } from 'react'
+import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
@@ -39,14 +40,14 @@ function Apps() {
   const appsQuery = useQuery({ queryKey: ['apps'], queryFn: listApps })
 
   return (
-    <main className="grid gap-6">
-      <section className="grid gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">Apps</h1>
-        <p className="text-muted-foreground">
+    <Page
+      title="Apps"
+      description={
+        <>
           Connect an agent to <code>{mcpUrl}</code> to create and change apps.
-        </p>
-      </section>
-
+        </>
+      }
+    >
       {appsQuery.isPending ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-32" />
@@ -92,6 +93,6 @@ function Apps() {
           ))}
         </section>
       ) : null}
-    </main>
+    </Page>
   )
 }

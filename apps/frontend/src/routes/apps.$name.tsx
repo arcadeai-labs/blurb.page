@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
 import { AppRenderer } from '@/components/app-renderer/app-renderer'
+import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Skeleton } from '@/components/ui/skeleton'
 import { getApp } from '@/lib/mcp'
@@ -18,34 +19,29 @@ function AppPage() {
 
   if (appQuery.isPending) {
     return (
-      <main className="grid gap-4">
-        <Skeleton className="h-9 w-64" />
+      <Page>
         <Skeleton className="h-64" />
-      </main>
+      </Page>
     )
   }
 
   if (appQuery.isError) {
     return (
-      <Alert variant="destructive">
-        <AlertTitle>Could not load the app</AlertTitle>
-        <AlertDescription>{appQuery.error.message}</AlertDescription>
-      </Alert>
+      <Page title={name}>
+        <Alert variant="destructive">
+          <AlertTitle>Could not load the app</AlertTitle>
+          <AlertDescription>{appQuery.error.message}</AlertDescription>
+        </Alert>
+      </Page>
     )
   }
 
   const app = appQuery.data
 
   return (
-    <main className="grid gap-6">
-      <section className="grid gap-2">
-        <h1 className="text-3xl font-semibold tracking-tight">{app.title}</h1>
-        {app.description ? (
-          <p className="text-muted-foreground">{app.description}</p>
-        ) : null}
-      </section>
+    <Page title={app.title} description={app.description}>
       {/* A changed app (e.g. updated by an agent) remounts with fresh state. */}
       <AppRenderer key={`${app.id}:${app.updatedAt}`} app={app} />
-    </main>
+    </Page>
   )
 }
