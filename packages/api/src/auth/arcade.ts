@@ -137,13 +137,23 @@ function isLocal(hostname: string) {
 
 /**
  * The origin users and MCP clients reach this server at. Requests on a
- * loopback address keep their own origin (MCP clients in dev use it);
- * everything else uses `FRONTEND_URL` when it's set, like app URLs do.
+ * loopback address keep their own origin (MCP clients in dev use it), unless
+ * portless forwarded them for a `https://*.localhost` name; everything else
+ * uses `FRONTEND_URL` when it's set, like app URLs do.
  */
 export function publicOrigin(request: Request) {
   const url = new URL(request.url)
 
   if (isLoopback(url.hostname)) {
+    // portless proxies to the loopback address, replacing `Host`; only a
+    // local proxy reaches this address, so its forwarded host is trusted.
+    const forwardedHost = request.headers.get('x-forwarded-host')
+
+    if (forwardedHost && isLocal(new URL(`http://${forwardedHost}`).hostname)) {
+      const proto = request.headers.get('x-forwarded-proto') ?? 'https'
+      return `${proto}://${forwardedHost}`
+    }
+
     return url.origin
   }
 
