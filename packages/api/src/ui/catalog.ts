@@ -141,6 +141,26 @@ export const appComponentDefinitions = {
     description:
       'Flex container for layouts. align defaults to "stretch" (full-width children) when vertical and "start" when horizontal.',
   },
+  // Apps sit under a navbar showing their title and description, so steer
+  // agents away from repeating them (and from filler) in the spec.
+  Card: {
+    ...shadcnComponentDefinitions.Card,
+    description:
+      'Container that groups one section of a page with several sections. Give it a short title only when it adds information and leave description out; a page with a single table or form needs no Card.',
+    example: { title: 'New issue' },
+  },
+  Heading: {
+    ...shadcnComponentDefinitions.Heading,
+    description:
+      'Heading text (h1-h4). Rarely needed: the navbar already shows the app title, and Cards have titles. Never use it for a page title or greeting.',
+    example: { text: 'Archived', level: 'h3' },
+  },
+  Text: {
+    ...shadcnComponentDefinitions.Text,
+    description:
+      'Paragraph text, for data and empty states. Not for intros, instructions or anything that restates what the UI already shows.',
+    example: { text: 'No issues', variant: 'muted' },
+  },
   ...customComponentDefinitions,
 }
 

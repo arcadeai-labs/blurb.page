@@ -1,15 +1,12 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import {
+  createRootRoute,
   HeadContent,
-  Link,
   Outlet,
   Scripts,
-  createRootRoute,
 } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 import type { ReactNode } from 'react'
-import { Button } from '@/components/ui/button'
-import { Separator } from '@/components/ui/separator'
 import { Toaster } from '@/components/ui/toast'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import '../index.css'
@@ -36,39 +33,7 @@ function RootLayout() {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
           <div className="min-h-svh">
-            <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-              <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-                <div className="grid gap-0.5">
-                  <strong className="text-sm font-medium">every-ui</strong>
-                  <span className="text-xs text-muted-foreground">
-                    Apps built by agents over MCP
-                  </span>
-                </div>
-                <nav
-                  aria-label="Primary navigation"
-                  className="flex items-center gap-1"
-                >
-                  <Button
-                    variant="ghost"
-                    nativeButton={false}
-                    render={
-                      <Link to="/" activeProps={{ 'aria-current': 'page' }} />
-                    }
-                  >
-                    Apps
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    nativeButton={false}
-                    render={<a href="/api">API Docs</a>}
-                  />
-                </nav>
-              </div>
-              <Separator />
-            </header>
-            <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-10">
-              <Outlet />
-            </div>
+            <Outlet />
           </div>
           <Toaster />
           <TanStackRouterDevtools />
