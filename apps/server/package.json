@@ -4,19 +4,18 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "wrangler dev --config ./wrangler.jsonc --ip ${HOST:-127.0.0.1} --port ${PORT:-8787} --inspector-port 0",
+    "dev": "tsx watch --clear-screen=false src/server.ts",
+    "start": "tsx src/server.ts",
     "build": "tsc -b",
-    "typecheck": "tsc -b",
-    "deploy": "pnpm build && wrangler deploy --config ./wrangler.jsonc",
-    "cf-typegen": "wrangler types --config ./wrangler.jsonc"
+    "typecheck": "tsc -b"
   },
   "dependencies": {
-    "@template/api": "workspace:*"
+    "@hono/node-server": "^2.1.3",
+    "@template/api": "workspace:*",
+    "tsx": "^4.23.15"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260528.1",
     "@types/node": "^24.12.3",
-    "typescript": "~5.9.3",
-    "wrangler": "^4.95.0"
+    "typescript": "~5.9.3"
   }
 }

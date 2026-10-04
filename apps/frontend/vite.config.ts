@@ -9,11 +9,18 @@ import path from 'node:path'
 // proxy, which terminates TLS on 443 and forwards to this Vite server.
 const portlessHost = process.env.PORTLESS_HOST
 
+// The API runs on Node (`apps/server`); in dev, `/api` is proxied to it so the
+// app can call it on its own origin.
+const apiOrigin = process.env.API_ORIGIN ?? 'http://127.0.0.1:8787'
+
 // https://vite.dev/config/
 export default defineConfig({
-  server: portlessHost
-    ? { hmr: { protocol: 'wss', host: portlessHost, clientPort: 443 } }
-    : {},
+  server: {
+    proxy: { '/api': { target: apiOrigin, changeOrigin: true } },
+    ...(portlessHost
+      ? { hmr: { protocol: 'wss', host: portlessHost, clientPort: 443 } }
+      : {}),
+  },
   plugins: [
     cloudflare({ viteEnvironment: { name: 'ssr' } }),
     tanstackStart({

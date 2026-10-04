@@ -11,16 +11,27 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "typecheck": "tsc -b"
+    "typecheck": "tsc -b",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:studio": "drizzle-kit studio",
+    "db:local": "pglite-server --db=.pglite --port=5433 --max-connections=10"
   },
   "dependencies": {
     "@hono/swagger-ui": "^0.5.2",
     "@hono/zod-openapi": "^1.4.0",
+    "@modelcontextprotocol/sdk": "^1.32.0",
+    "drizzle-orm": "^0.45.3",
     "hono": "^4.12.23",
+    "postgres": "^3.4.9",
+    "run": "^2.1.7",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260528.1",
+    "@electric-sql/pglite": "^0.5.8",
+    "@electric-sql/pglite-socket": "^0.2.11",
+    "@types/node": "^24.12.4",
+    "drizzle-kit": "^0.31.11",
     "typescript": "~5.9.3"
   }
 }

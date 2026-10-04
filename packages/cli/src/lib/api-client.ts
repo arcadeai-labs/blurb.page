@@ -6,7 +6,7 @@ import { findRepoRoot } from './workspace.ts'
 
 /**
  * Where the API lives. Explicit `--base-url` wins, then `TEMPLATE_API_BASE_URL`,
- * then the portless URL of the frontend, which mounts the same Hono app.
+ * then the portless URL of the Node API server.
  */
 export function resolveBaseUrl(explicit?: string): string {
   const configured = explicit ?? process.env.TEMPLATE_API_BASE_URL
@@ -15,7 +15,7 @@ export function resolveBaseUrl(explicit?: string): string {
     return configured.replace(/\/$/, '')
   }
 
-  return getPortlessRoute('frontend', findRepoRoot() ?? process.cwd()).url
+  return getPortlessRoute('server', findRepoRoot() ?? process.cwd()).url
 }
 
 export function createApiClient(baseUrl: string) {
@@ -28,11 +28,14 @@ export type ApiClient = ReturnType<typeof createApiClient>
 
 class ApiHttpError extends Error {
   status: number
+  /** Whether the API itself answered, rather than the proxy in front of it. */
+  fromApi: boolean
 
-  constructor(status: number, message: string) {
+  constructor(status: number, message: string, fromApi: boolean) {
     super(message)
     this.name = 'ApiHttpError'
     this.status = status
+    this.fromApi = fromApi
   }
 }
 
@@ -59,6 +62,7 @@ export async function withApi<T>(
     }
     if (
       error instanceof ApiHttpError &&
+      !error.fromApi &&
       UNREACHABLE_STATUSES.includes(error.status)
     ) {
       throw new Error(`${error.message}. ${unreachableHint(baseUrl)}`)
@@ -92,20 +96,30 @@ export async function assertOk(response: ErrorReadableResponse) {
   }
 
   // Anything but JSON here came from the proxy or an error page, not the API.
-  const detail = response.headers.get('content-type')?.includes('json')
-    ? summarize(await response.text())
-    : ''
+  const fromApi = !!response.headers.get('content-type')?.includes('json')
+  const detail = fromApi ? summarize(await response.text()) : ''
 
   throw new ApiHttpError(
     response.status,
     `Request failed with ${response.status}${detail}`,
+    fromApi,
   )
 }
 
+type JsonResponse = ErrorReadableResponse & { json(): Promise<unknown> }
+
+/** The JSON body of the 2xx variants of a Hono RPC response union. */
+type SuccessJson<R> = R extends { ok: false }
+  ? never
+  : R extends { json(): Promise<infer T> }
+    ? T
+    : never
+
 /** Reads a successful Hono RPC response as JSON. */
-export async function readJson<T>(
-  response: ErrorReadableResponse & { json(): Promise<T> },
-): Promise<T> {
+export async function readJson<R extends JsonResponse>(
+  response: R,
+): Promise<SuccessJson<R>>
+export async function readJson(response: JsonResponse): Promise<unknown> {
   await assertOk(response)
 
   return response.json()

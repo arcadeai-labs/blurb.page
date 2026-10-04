@@ -2,9 +2,11 @@ import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { cors } from 'hono/cors'
 
+import { scriptsRoutes } from './routes/scripts'
 import { statsRoutes } from './routes/stats'
+import { toolsRoutes } from './routes/tools'
 
-/** Path the API is mounted at, by both `apps/server` and `apps/frontend`. */
+/** Path the API is mounted at by `apps/server`. */
 export const apiBasePath = '/api'
 
 export const api = new OpenAPIHono()
@@ -16,13 +18,15 @@ export const api = new OpenAPIHono()
     },
     servers: [{ url: apiBasePath }],
   })
+  .use('*', cors())
   .get('/', swaggerUI({ url: `${apiBasePath}/openapi.json` }))
-  .use('/stats', cors())
   .route('/stats', statsRoutes)
+  .route('/scripts', scriptsRoutes)
+  .route('/tools', toolsRoutes)
 
 export type AppType = typeof api
 
-/** The API mounted at `/api`, ready to be used as a Worker fetch handler. */
+/** The API mounted at `/api`, ready to be served by `@hono/node-server`. */
 export const app = new OpenAPIHono().route(apiBasePath, api)
 
 export default app

@@ -6,6 +6,7 @@ import {
   withApi,
 } from '../lib/api-client.ts'
 import { openBrowser } from '../lib/browser.ts'
+import { registerScriptCommands } from './scripts.ts'
 
 type ApiOptions = {
   baseUrl?: string
@@ -13,7 +14,7 @@ type ApiOptions = {
 }
 
 const BASE_URL_HELP =
-  'API origin (defaults to $TEMPLATE_API_BASE_URL, then the portless frontend URL)'
+  'API origin (defaults to $TEMPLATE_API_BASE_URL, then the portless server URL)'
 
 /**
  * Shared options for every API subcommand, so `--base-url` can be passed after
@@ -35,7 +36,7 @@ export function registerApiCommands(program: Command) {
     .description('Call the Hono API through its typed RPC client')
 
   withApiOptions(
-    api.command('stats').description('GET /api/stats — Worker runtime stats'),
+    api.command('stats').description('GET /api/stats — API runtime stats'),
   ).action(async (options: ApiOptions) => {
     const stats = await withApi(
       resolveBaseUrl(options.baseUrl),
@@ -86,4 +87,6 @@ export function registerApiCommands(program: Command) {
         openBrowser(url)
       }
     })
+
+  registerScriptCommands(api)
 }

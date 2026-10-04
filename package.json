@@ -15,8 +15,12 @@
     "lint": "biome lint .",
     "preview": "turbo preview",
     "deploy": "turbo deploy --filter=@template/frontend",
-    "deploy:server": "turbo deploy --filter=@template/server",
-    "cf-typegen": "turbo cf-typegen"
+    "cf-typegen": "turbo cf-typegen",
+    "db:generate": "pnpm --filter @template/api db:generate",
+    "db:migrate": "pnpm --filter @template/api db:migrate",
+    "db:studio": "pnpm --filter @template/api db:studio",
+    "db:local": "pnpm --filter @template/api db:local",
+    "start": "pnpm --filter @template/server start"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",

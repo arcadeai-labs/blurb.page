@@ -4,62 +4,95 @@ This template is a PNPM/Turbo monorepo:
 
 - `packages/api`: the Hono (OpenAPI) app — the single source of truth for the API
 - `packages/cli`: the `template` CLI — dev servers and typed API access
-- `apps/frontend`: TanStack Start React app that mounts `packages/api` at `/api`
-- `apps/server`: optional standalone Worker that serves the same API on its own
+- `apps/frontend`: TanStack Start React app on a Cloudflare Worker
+- `apps/server`: Node server (`@hono/node-server`) that serves `packages/api`
 
-`pnpm dev` runs `pnpm cli dev`, which starts only the frontend — it serves both
-the app and the API from one Worker through portless with HTTPS enabled:
+The API is Node-only: script execution uses the [`run`](https://www.run-sdk.dev)
+sandbox, which needs `node:worker_threads`. The frontend stays a Worker.
 
-- `https://frontend.localhost` — the app
-- `https://frontend.localhost/api` — Swagger UI for the same Hono app
-- `https://frontend.localhost/api/stats` — the one query endpoint the frontend
-  reads with Hono RPC and React Query
+`pnpm dev` runs `pnpm cli dev`, which starts both apps through portless with
+HTTPS enabled:
+
+- `https://frontend.localhost` — the app; Vite proxies `/api` to the API server
+- `https://server.localhost/api` — Swagger UI for the Hono app
 
 On non-`main` branches the branch slug is prepended to the hostname, for example
 `https://my-branch.frontend.localhost`.
 
 The frontend uses TanStack server functions for app-owned reads and mutations,
-and the Hono RPC client for the API. Because the API is mounted on the same
-Worker, the client calls it on the current origin; set `VITE_API_BASE_URL` to
-point it at a separately deployed API instead.
-
-`apps/server` exists for running or deploying the API on its own. It imports the
-same `packages/api` app, so it needs no routes of its own:
+and the Hono RPC client for the API. In dev the client calls the API on the
+current origin through the Vite proxy; set `VITE_API_BASE_URL` to point a
+deployed frontend at the deployed API.
 
 ```sh
-pnpm dev:server     # https://server.localhost
-pnpm deploy:server
+pnpm dev:server     # just the API, at https://server.localhost
+pnpm start          # the API without watch mode
 ```
+
+## Scripts
+
+`/api/scripts` is CRUD for saved scripts, and `POST /api/scripts/:id/execute`
+runs one in the `run` QuickJS sandbox. Every tool on the MCP server at
+`MCP_URL` is exposed to scripts as `tools.<functionName>(args)`. Names are made
+into valid identifiers, so `Gmail.ListEmails` becomes `tools.Gmail_ListEmails`.
+`GET /api/tools` lists them.
+
+```js
+const emails = await tools.Gmail_ListEmails({ n_emails: 5 })
+return emails
+```
+
+Tool results come back as structured content, or as parsed JSON text, or as plain
+text. Script failures, including tool errors, return
+`{ ok: false, error: { code, message } }`. The server sends
+`Authorization: Bearer $ARCADE_API_KEY` and `Arcade-User-ID: $ARCADE_USER_ID`
+to the MCP server when those are set. `apps/server` reads the repo-root
+`.env.local` and `.env`.
 
 ## CLI
 
 `packages/cli` is exposed at the repo root as `pnpm cli`:
 
 ```sh
-pnpm cli dev                 # frontend on portless, opens the browser when ready
+pnpm cli dev                 # API + frontend on portless, opens the browser when ready
 pnpm cli dev --no-open       # …without opening the browser
-pnpm cli dev server          # apps/server instead
+pnpm cli dev server          # just apps/server
 pnpm cli api stats           # GET /api/stats
 pnpm cli api stats --json    # raw JSON
 pnpm cli api openapi         # GET /api/openapi.json
 pnpm cli api docs --open     # Swagger UI
+pnpm cli api tools           # MCP tools available to scripts
+pnpm cli api scripts list
+pnpm cli api scripts create --name inbox --file inbox.js
+pnpm cli api scripts get|update|delete|execute <id>
 ```
 
 `pnpm dev` is `pnpm cli dev`: it starts the portless HTTPS proxy, registers the
-branch's alias, runs the app's own `dev` script behind it, waits for the URL to
+branch's alias for each app, runs each app's own `dev` script behind it, waits for the URL to
 answer and opens it in a browser, then removes the alias on exit. Running an
 app's `dev` script directly (`pnpm --filter @template/frontend dev`) skips
 portless and serves plain HTTP on the app's port.
 
 The `api` commands call the same Hono app through the typed RPC client, so they
-stay in sync with `packages/api`. They target `$TEMPLATE_API_BASE_URL`, or the
-portless frontend URL, or `--base-url`. Node does not read the system trust
+stay in sync with `packages/api`. They target `--base-url`, or `$TEMPLATE_API_BASE_URL`, or the
+portless server URL. Node does not read the system trust
 store, so the CLI adds the portless CA (`~/.portless/ca.pem`) to its own trust
 list to reach `https://*.localhost`.
 
 The package is independently publishable: `pnpm --filter @template/cli build`
 bundles it with tsdown, inlining workspace dependencies so `commander` and
 `hono` are the only runtime dependencies of the published `template` binary.
+
+## Database
+
+Drizzle + Postgres, in `packages/api/src/db`. Everything connects through a
+plain `DATABASE_URL` (`postgres.js`); routes use the shared client from `getDb()`.
+
+- Without `DATABASE_URL`, everything falls back to a local PGlite database. Run
+  `pnpm db:local` to serve it at `postgres://postgres:postgres@127.0.0.1:5433/postgres`.
+- `pnpm db:generate` / `pnpm db:migrate` / `pnpm db:studio` read `DATABASE_URL`
+  from the environment, then from the repo-root `.env.local` or `.env`.
+- `apps/server` reads it from the same files. Migrations never run on startup.
 
 ## Commands
 
@@ -73,7 +106,7 @@ pnpm fmt
 pnpm deploy
 ```
 
-Regenerate Worker environment types after changing either app's `wrangler.jsonc`:
+Regenerate the frontend Worker's environment types after changing its `wrangler.jsonc`:
 
 ```sh
 pnpm cf-typegen

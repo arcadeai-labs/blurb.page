@@ -2,10 +2,10 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 const statsResponseSchema = z
   .object({
-    region: z.string().openapi({ example: 'SJC' }),
-    uptimeMode: z.string().openapi({ example: 'per-request isolate' }),
+    region: z.string().openapi({ example: 'local' }),
+    uptimeMode: z.string().openapi({ example: 'long-lived Node process' }),
     features: z.array(z.string()).openapi({
-      example: ['Hono API', 'React Query', 'TanStack Start', 'Workers SSR'],
+      example: ['Hono API', 'Drizzle', 'Run SDK', 'MCP tools'],
     }),
   })
   .openapi('StatsResponse')
@@ -13,7 +13,7 @@ const statsResponseSchema = z
 const statsRoute = createRoute({
   method: 'get',
   path: '/',
-  summary: 'Read Worker runtime stats',
+  summary: 'Read API runtime stats',
   responses: {
     200: {
       description: 'Runtime metadata',
@@ -27,14 +27,11 @@ const statsRoute = createRoute({
 })
 
 export const statsRoutes = new OpenAPIHono().openapi(statsRoute, (c) => {
-  const region =
-    typeof c.req.raw.cf?.colo === 'string' ? c.req.raw.cf.colo : 'local'
-
   return c.json(
     {
-      region,
-      uptimeMode: 'per-request isolate',
-      features: ['Hono API', 'React Query', 'TanStack Start', 'Workers SSR'],
+      region: process.env.REGION ?? 'local',
+      uptimeMode: 'long-lived Node process',
+      features: ['Hono API', 'Drizzle', 'Run SDK', 'MCP tools'],
     },
     200,
   )

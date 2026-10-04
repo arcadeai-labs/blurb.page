@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "tsBuildInfoFile": "../../node_modules/.tmp/server-worker.tsbuildinfo",
+    "tsBuildInfoFile": "../../node_modules/.tmp/server.tsbuildinfo",
     "target": "es2023",
     "lib": ["ES2023"],
     "module": "esnext",
@@ -10,11 +10,11 @@
     "noEmit": true,
     "strictNullChecks": true,
     "skipLibCheck": true,
-    "types": ["@cloudflare/workers-types"],
+    "types": ["node"],
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": ["src", "worker-configuration.d.ts"]
+  "include": ["src"]
 }
