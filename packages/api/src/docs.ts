@@ -1,7 +1,7 @@
 import { getDb } from './db'
-import { apps, type Doc, docs, scripts } from './db/schema'
+import { apps, type Doc, docs, scripts, svgs } from './db/schema'
 import { docEmbeds, type Embed, parseEmbed } from './ui/doc'
-import { referencedScripts, validateApp } from './ui/validate'
+import { referencedScripts, referencedSvgs, validateApp } from './ui/validate'
 
 export function toDocSummary(doc: Doc, baseUrl: string) {
   return {
@@ -29,11 +29,15 @@ export async function docErrors(body: string) {
     return []
   }
 
-  const [scriptRows, appRows] = await Promise.all([
+  const [scriptRows, svgRows, appRows] = await Promise.all([
     getDb().select({ name: scripts.name }).from(scripts),
+    getDb().select({ name: svgs.name }).from(svgs),
     getDb().select({ name: apps.name }).from(apps),
   ])
-  const scriptNames = new Set(scriptRows.map((row) => row.name))
+  const existing = {
+    scripts: new Set(scriptRows.map((row) => row.name)),
+    svgs: new Set(svgRows.map((row) => row.name)),
+  }
   const appNames = new Set(appRows.map((row) => row.name))
 
   function errors(source: string) {
@@ -43,7 +47,7 @@ export async function docErrors(body: string) {
       return parsed.errors
     }
     if (parsed.kind === 'spec') {
-      return validateApp({ spec: parsed.spec }, scriptNames)
+      return validateApp({ spec: parsed.spec }, existing)
     }
     return appNames.has(parsed.app)
       ? []
@@ -76,6 +80,15 @@ export function docsRunning(scriptName: string) {
     (embed) =>
       embed.kind === 'spec' &&
       referencedScripts({ spec: embed.spec }).has(scriptName),
+  )
+}
+
+/** Names of the docs with a component that shows the SVG called `svgName`. */
+export function docsShowing(svgName: string) {
+  return docsWith(
+    (embed) =>
+      embed.kind === 'spec' &&
+      referencedSvgs({ spec: embed.spec }).has(svgName),
   )
 }
 

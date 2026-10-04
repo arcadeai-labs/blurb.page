@@ -7,17 +7,19 @@ import { z } from 'zod'
 import {
   appErrors,
   appsRunning,
+  appsShowing,
   frontendUrl,
   toAppJson,
   toAppSummary,
 } from './apps'
 import { getDb } from './db'
 import { isUniqueViolation } from './db/errors'
-import { apps, docs, type Script, scripts } from './db/schema'
+import { apps, docs, type Script, scripts, svgs } from './db/schema'
 import {
   docErrors,
   docsMounting,
   docsRunning,
+  docsShowing,
   toDocJson,
   toDocSummary,
 } from './docs'
@@ -25,6 +27,8 @@ import { executeScript } from './execute'
 import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
 import type { ScriptError } from './script-error'
 import { scriptFields, scriptName } from './script-fields'
+import { svgFields, svgName } from './svg-fields'
+import { toSvgJson, toSvgSummary } from './svgs'
 import { appFields, appName } from './ui/app'
 import { docFields, docName } from './ui/doc'
 import { appGuide, docGuide } from './ui/guide'
@@ -67,6 +71,8 @@ const appNotFound = () => fail('App not found')
 
 const docNotFound = () => fail('Doc not found')
 
+const svgNotFound = () => fail('SVG not found')
+
 function invalidApp(errors: string[]) {
   return fail(
     `The app is invalid. Fix these and retry (see get_app_guide):\n- ${errors.join('\n- ')}`,
@@ -91,20 +97,46 @@ async function upstream(fn: () => Promise<CallToolResult>) {
   }
 }
 
-/** Reports a taken name as a tool error. */
+/** Reports a taken name as a tool error; `kind` is e.g. "A script". */
 async function uniqueName(kind: string, fn: () => Promise<CallToolResult>) {
   try {
     return await fn()
   } catch (error) {
     if (isUniqueViolation(error)) {
-      return fail(`A ${kind} with that name already exists`)
+      return fail(`${kind} with that name already exists`)
     }
     throw error
   }
 }
 
-/** Adds `note` and a list of `names` to a result, when there are any. */
-function withNote(result: CallToolResult, note: string, names: string[]) {
+/** The apps and docs that run the script called `scriptName`, labelled. */
+async function scriptUsers(scriptName: string) {
+  const [appNames, docNames] = await Promise.all([
+    appsRunning(scriptName),
+    docsRunning(scriptName),
+  ])
+
+  return [
+    ...appNames.map((name) => `app ${name}`),
+    ...docNames.map((name) => `doc ${name}`),
+  ]
+}
+
+/** The apps and docs that show the SVG called `svgName`, labelled. */
+async function svgUsers(svgName: string) {
+  const [appNames, docNames] = await Promise.all([
+    appsShowing(svgName),
+    docsShowing(svgName),
+  ])
+
+  return [
+    ...appNames.map((name) => `app ${name}`),
+    ...docNames.map((name) => `doc ${name}`),
+  ]
+}
+
+/** Adds a note listing apps and docs (e.g. those that run a script), when there are any. */
+function withAppsNote(result: CallToolResult, names: string[], note: string) {
   if (names.length === 0) {
     return result
   }
@@ -118,34 +150,18 @@ function withNote(result: CallToolResult, note: string, names: string[]) {
   }
 }
 
-/** Adds a note listing the apps and docs that run a script, when there are any. */
-async function withAppsNote(
-  result: CallToolResult,
-  scriptName: string,
-  note: string,
-) {
-  const [appNames, docNames] = await Promise.all([
-    appsRunning(scriptName),
-    docsRunning(scriptName),
-  ])
-
-  return withNote(result, note, [
-    ...appNames.map((name) => `app ${name}`),
-    ...docNames.map((name) => `doc ${name}`),
-  ])
-}
-
 const scriptId = z.uuid().describe('Script ID')
 
 const appId = z.uuid().describe('App ID')
 
 const docId = z.uuid().describe('Doc ID')
 
+const svgId = z.uuid().describe('SVG ID')
+
 /** Looks a row up by `id` or `name`, whichever was given. */
-function idOrName<T extends typeof scripts | typeof apps | typeof docs>(
-  table: T,
-  args: { id?: string; name?: string },
-) {
+function idOrName<
+  T extends typeof scripts | typeof apps | typeof docs | typeof svgs,
+>(table: T, args: { id?: string; name?: string }) {
   if (args.id) {
     return eq(table.id, args.id)
   }
@@ -160,6 +176,7 @@ function instructions(baseUrl: string) {
 
 - Scripts are server-side JavaScript that call the upstream integration tools (list_script_tools) as \`await tools.<functionName>(args)\`, take a validated \`input\` and return JSON.
 - Apps are json-render UI specs rendered with shadcn/ui at ${baseUrl}/apps/<name>. Their buttons, forms and load hooks run scripts by name (the runScript action) and render the results.
+- SVGs are saved images (diagrams, illustrations, icons) that apps show by name with the Svg component. Create them with create_svg.
 
 Before creating or changing an app, call get_app_guide once: it documents the spec format, every component and action, and patterns for loading data, forms, tables, charts and row actions. Typical flow: list_script_tools → create_script (one per data operation; test with execute_script) → create_app → share the returned url. Use the list_/get_/update_/delete_ tools to change existing scripts and apps.
 
@@ -267,7 +284,7 @@ function createMcpServer(baseUrl: string) {
       inputSchema: scriptFields,
     },
     (args) =>
-      uniqueName('script', async () => {
+      uniqueName('A script', async () => {
         const [script] = await getDb().insert(scripts).values(args).returning()
 
         return ok(toJson(script))
@@ -283,7 +300,7 @@ function createMcpServer(baseUrl: string) {
       annotations: { idempotentHint: true },
     },
     ({ id, ...values }) =>
-      uniqueName('script', async () => {
+      uniqueName('A script', async () => {
         const [previous] = await getDb()
           .select({ name: scripts.name })
           .from(scripts)
@@ -302,7 +319,7 @@ function createMcpServer(baseUrl: string) {
           ? ok(toJson(script))
           : withAppsNote(
               ok(toJson(script)),
-              previous.name,
+              await scriptUsers(previous.name),
               `Renamed from "${previous.name}"; update these apps and docs, which still run the old name`,
             )
       }),
@@ -327,7 +344,7 @@ function createMcpServer(baseUrl: string) {
 
       return withAppsNote(
         ok({ id: script.id }),
-        script.name,
+        await scriptUsers(script.name),
         'These apps and docs still run the deleted script',
       )
     },
@@ -421,7 +438,7 @@ function createMcpServer(baseUrl: string) {
         return invalidApp(errors)
       }
 
-      return uniqueName('app', async () => {
+      return uniqueName('An app', async () => {
         const [app] = await getDb().insert(apps).values(args).returning()
 
         return ok(toAppJson(app, baseUrl))
@@ -456,7 +473,7 @@ function createMcpServer(baseUrl: string) {
         return invalidApp(errors)
       }
 
-      return uniqueName('app', async () => {
+      return uniqueName('An app', async () => {
         const [app] = await getDb()
           .update(apps)
           .set(values)
@@ -467,10 +484,10 @@ function createMcpServer(baseUrl: string) {
           return appNotFound()
         }
 
-        return withNote(
+        return withAppsNote(
           ok(toAppJson(app, baseUrl)),
-          `Renamed from "${existing.name}"; update these docs, which still mount the old name`,
           existing.name === app.name ? [] : await docsMounting(existing.name),
+          `Renamed from "${existing.name}"; update these docs, which still mount the old name`,
         )
       })
     },
@@ -493,10 +510,10 @@ function createMcpServer(baseUrl: string) {
         return appNotFound()
       }
 
-      return withNote(
+      return withAppsNote(
         ok({ id: app.id }),
-        'These docs still mount the deleted app',
         await docsMounting(app.name),
+        'These docs still mount the deleted app',
       )
     },
   )
@@ -561,7 +578,7 @@ function createMcpServer(baseUrl: string) {
         return invalidDoc(errors)
       }
 
-      return uniqueName('doc', async () => {
+      return uniqueName('A doc', async () => {
         const [doc] = await getDb().insert(docs).values(args).returning()
 
         return ok(toDocJson(doc, baseUrl))
@@ -585,7 +602,7 @@ function createMcpServer(baseUrl: string) {
         return invalidDoc(errors)
       }
 
-      return uniqueName('doc', async () => {
+      return uniqueName('A doc', async () => {
         const [doc] = await getDb()
           .update(docs)
           .set(values)
@@ -611,6 +628,116 @@ function createMcpServer(baseUrl: string) {
         .returning({ id: docs.id })
 
       return doc ? ok({ id: doc.id }) : docNotFound()
+    },
+  )
+
+  server.registerTool(
+    'list_svgs',
+    {
+      description: 'List SVGs (without their markup)',
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const rows = await getDb()
+        .select()
+        .from(svgs)
+        .orderBy(desc(svgs.updatedAt))
+
+      return ok({ svgs: rows.map(toSvgSummary) })
+    },
+  )
+
+  server.registerTool(
+    'get_svg',
+    {
+      description: 'Get an SVG, including its markup, by id or name',
+      inputSchema: { id: svgId.optional(), name: svgName.optional() },
+      annotations: { readOnlyHint: true },
+    },
+    async (args) => {
+      const where = idOrName(svgs, args)
+
+      if (!where) {
+        return fail('Pass an id or a name')
+      }
+
+      const [row] = await getDb().select().from(svgs).where(where)
+
+      return row ? ok(toSvgJson(row)) : svgNotFound()
+    },
+  )
+
+  server.registerTool(
+    'create_svg',
+    {
+      description:
+        'Save an SVG image (a diagram, illustration, icon or logo) that apps show by its (unique) name with { "type": "Svg", "props": { "name": "<name>" } }.',
+      inputSchema: svgFields,
+    },
+    (args) =>
+      uniqueName('An SVG', async () => {
+        const [row] = await getDb().insert(svgs).values(args).returning()
+
+        return ok(toSvgJson(row))
+      }),
+  )
+
+  server.registerTool(
+    'update_svg',
+    {
+      description:
+        'Update an SVG. Fields left out are kept. Apps showing it update too; renaming breaks apps that show it by the old name.',
+      inputSchema: { id: svgId, ...z.object(svgFields).partial().shape },
+      annotations: { idempotentHint: true },
+    },
+    ({ id, ...values }) =>
+      uniqueName('An SVG', async () => {
+        const [previous] = await getDb()
+          .select({ name: svgs.name })
+          .from(svgs)
+          .where(eq(svgs.id, id))
+        const [row] = await getDb()
+          .update(svgs)
+          .set(values)
+          .where(eq(svgs.id, id))
+          .returning()
+
+        if (!row || !previous) {
+          return svgNotFound()
+        }
+
+        return previous.name === row.name
+          ? ok(toSvgJson(row))
+          : withAppsNote(
+              ok(toSvgJson(row)),
+              await svgUsers(previous.name),
+              `Renamed from "${previous.name}"; update these apps and docs, which still show the old name`,
+            )
+      }),
+  )
+
+  server.registerTool(
+    'delete_svg',
+    {
+      description: 'Delete an SVG',
+      inputSchema: { id: svgId },
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    async (args) => {
+      const [row] = await getDb()
+        .delete(svgs)
+        .where(eq(svgs.id, args.id))
+        .returning({ id: svgs.id, name: svgs.name })
+
+      if (!row) {
+        return svgNotFound()
+      }
+
+      return withAppsNote(
+        ok({ id: row.id }),
+        await svgUsers(row.name),
+        'These apps and docs still show the deleted SVG',
+      )
     },
   )
 

@@ -5,6 +5,7 @@ import { cors } from 'hono/cors'
 import { handleMcpRequest } from './mcp-server'
 import { scriptsRoutes } from './routes/scripts'
 import { statsRoutes } from './routes/stats'
+import { svgsRoutes } from './routes/svgs'
 import { toolsRoutes } from './routes/tools'
 
 /** Path the API is mounted at by `apps/frontend`. */
@@ -23,6 +24,7 @@ export const api = new OpenAPIHono()
   .get('/', swaggerUI({ url: `${apiBasePath}/openapi.json` }))
   .route('/stats', statsRoutes)
   .route('/scripts', scriptsRoutes)
+  .route('/svgs', svgsRoutes)
   .route('/tools', toolsRoutes)
 
 export type AppType = typeof api

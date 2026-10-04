@@ -149,6 +149,20 @@ export const customComponentDefinitions = {
       'Rich text written in GitHub-flavored Markdown: headings, **bold**, _italic_, lists, task lists, links, quotes, code, tables and images. Use it for prose and bullet points (e.g. slide content); use Text for a single value. Put live values in with { "$template": "Revenue is ${/queries/stats/data/revenue}" }. Raw HTML is shown as text.',
     example: { text: '- Revenue up **12%**\n- Churn down to 2%' },
   },
+  Svg: {
+    props: z.object({
+      name: z.string(),
+      alt: z.string().nullable(),
+      height: z.number().nullable(),
+    }),
+    slots: [],
+    description:
+      'An SVG image saved with create_svg, shown by its name: diagrams, illustrations, icons and logos (for charts of data use Chart). It is as wide as its container, keeping its aspect ratio; height in px sets the height instead (the width follows). alt describes it for screen readers; leave it out when the image is decorative. Theme colors in the SVG (currentColor, var(--foreground), var(--chart-1) …) follow the app theme.',
+    example: {
+      name: 'runtime-diagram',
+      alt: 'Agents call tools through Arcade',
+    },
+  },
   Slides: {
     props: z.object({}),
     slots: ['default'],
