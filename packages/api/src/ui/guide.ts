@@ -1,4 +1,4 @@
-import type { ActionBinding, AppSpec } from './app'
+import type { AppSpec } from './app'
 import { appCatalog } from './catalog'
 
 /**
@@ -15,60 +15,47 @@ function catalogReference() {
   return start >= 0 && end > start ? prompt.slice(start, end).trim() : prompt
 }
 
-const loadIssues: ActionBinding = {
-  action: 'runScript',
-  params: {
-    script: 'list-issues',
-    input: { state: { $state: '/filter' } },
-    statePath: '/issues',
-    loadingPath: '/loading',
-    errorPath: '/error',
-  },
-}
-
 /** A complete, valid `create_app` call; scripts are referenced by name. */
 export const exampleApp: {
   name: string
   title: string
   description: string
   spec: AppSpec
-  onLoad: ActionBinding[]
 } = {
   name: 'issue-tracker',
   title: 'Issue tracker',
   description: 'List, chart, open and close issues',
-  onLoad: [
-    loadIssues,
-    {
-      action: 'runScript',
-      params: { script: 'issue-stats', statePath: '/stats' },
-    },
-  ],
   spec: {
     root: 'page',
     state: {
       filter: 'open',
-      issues: [],
-      stats: { open: 0, closed: 0, byLabel: [] },
       form: { title: '', body: '' },
-      loading: false,
-      error: null,
+    },
+    queries: {
+      issues: {
+        script: 'list-issues',
+        input: { state: { $state: '/filter' } },
+      },
+      stats: { script: 'issue-stats' },
+    },
+    mutations: {
+      createIssue: {
+        script: 'create-issue',
+        input: { $state: '/form' },
+        invalidates: ['issues', 'stats'],
+      },
+      closeIssue: { script: 'close-issue', invalidates: ['issues', 'stats'] },
     },
     elements: {
       page: {
         type: 'Stack',
         props: { direction: 'vertical', gap: 'lg' },
-        children: ['error', 'metrics', 'chart', 'issues-card', 'new-issue'],
+        children: ['stats', 'issues-card', 'new-issue'],
       },
-      error: {
-        type: 'Alert',
-        props: {
-          type: 'error',
-          title: 'Could not load issues',
-          message: { $state: '/error' },
-        },
-        visible: { $state: '/error' },
-        children: [],
+      stats: {
+        type: 'Query',
+        props: { query: 'stats' },
+        children: ['metrics', 'chart'],
       },
       metrics: {
         type: 'Grid',
@@ -77,12 +64,15 @@ export const exampleApp: {
       },
       'metric-open': {
         type: 'Metric',
-        props: { label: 'Open', value: { $state: '/stats/open' } },
+        props: { label: 'Open', value: { $state: '/queries/stats/data/open' } },
         children: [],
       },
       'metric-closed': {
         type: 'Metric',
-        props: { label: 'Closed', value: { $state: '/stats/closed' } },
+        props: {
+          label: 'Closed',
+          value: { $state: '/queries/stats/data/closed' },
+        },
         children: [],
       },
       chart: {
@@ -90,7 +80,7 @@ export const exampleApp: {
         props: {
           type: 'bar',
           title: 'Issues by label',
-          data: { $state: '/stats/byLabel' },
+          data: { $state: '/queries/stats/data/byLabel' },
           xKey: 'label',
           series: [
             { key: 'open', label: 'Open' },
@@ -103,7 +93,7 @@ export const exampleApp: {
       'issues-card': {
         type: 'Card',
         props: { title: 'Issues' },
-        children: ['filter', 'loading', 'issues', 'no-issues'],
+        children: ['filter', 'issues'],
       },
       filter: {
         type: 'Select',
@@ -113,29 +103,23 @@ export const exampleApp: {
           options: ['open', 'closed'],
           value: { $bindState: '/filter' },
         },
-        watch: { '/filter': loadIssues },
-        children: [],
-      },
-      loading: {
-        type: 'Spinner',
-        props: { label: 'Loading issues' },
-        visible: { $state: '/loading' },
         children: [],
       },
       issues: {
+        type: 'Query',
+        props: { query: 'issues' },
+        children: ['issue-table', 'no-issues'],
+      },
+      'issue-table': {
         type: 'RowTable',
         props: { columns: ['Title', 'Labels', ''] },
-        repeat: { statePath: '/issues', key: 'id' },
-        visible: { $state: '/loading', not: true },
+        repeat: { statePath: '/queries/issues/data', key: 'id' },
         children: ['issue-row'],
       },
       'no-issues': {
         type: 'Text',
         props: { text: 'No issues', variant: 'muted' },
-        visible: [
-          { $state: '/loading', not: true },
-          { $state: '/issues/0', not: true },
-        ],
+        visible: { $state: '/queries/issues/data/0', not: true },
         children: [],
       },
       'issue-row': {
@@ -155,19 +139,25 @@ export const exampleApp: {
       },
       'issue-close': {
         type: 'Button',
-        props: { label: 'Close', variant: 'secondary' },
+        props: {
+          label: 'Close',
+          variant: 'secondary',
+          disabled: { $state: '/mutations/closeIssue/isPending' },
+        },
         visible: { $item: 'state', eq: 'open' },
         on: {
           press: [
             {
-              action: 'runScript',
-              params: { script: 'close-issue', input: { id: { $item: 'id' } } },
+              action: 'mutate',
+              params: {
+                mutation: 'closeIssue',
+                input: { id: { $item: 'id' } },
+              },
               confirm: {
                 title: 'Close issue?',
                 message: 'It can be reopened later.',
               },
             },
-            loadIssues,
             { action: 'toast', params: { message: 'Issue closed' } },
           ],
         },
@@ -199,22 +189,20 @@ export const exampleApp: {
       },
       create: {
         type: 'Button',
-        props: { label: 'Create issue' },
+        props: {
+          label: 'Create issue',
+          disabled: { $state: '/mutations/createIssue/isPending' },
+        },
         on: {
           press: [
             {
-              action: 'runScript',
-              params: {
-                script: 'create-issue',
-                input: { $state: '/form' },
-                validate: true,
-              },
+              action: 'mutate',
+              params: { mutation: 'createIssue', validate: true },
             },
             {
               action: 'setState',
               params: { statePath: '/form', value: { title: '', body: '' } },
             },
-            loadIssues,
             {
               action: 'toast',
               params: { message: 'Issue created', type: 'success' },
@@ -274,7 +262,7 @@ An app is a web UI described as JSON (a json-render spec) and rendered with shad
 
 1. list_script_tools — the integration tools scripts can call (and their input schemas).
 2. create_script — one script per data operation the app needs (list, get, create, update, delete, aggregate for a chart…). Test each with execute_script before wiring it into a UI.
-3. create_app — the spec, plus onLoad actions that fill state when the app opens. The response has the app URL. It is rejected with a list of errors if anything is invalid; fix them and retry.
+3. create_app — the spec: its elements, plus the queries that load data and the mutations that change it. The response has the app URL. It is rejected with a list of errors if anything is invalid; fix them and retry.
 4. Iterate with get_app / update_app (send the whole spec) / delete_app, and list_apps / list_scripts to see what exists.
 
 ## Scripts
@@ -295,7 +283,7 @@ ${JSON.stringify(exampleScript, null, 2)}
 
 ## App specs
 
-An app is \`{ name, title, description, spec, onLoad }\`. The spec is a single JSON object (not a stream of patches):
+An app is \`{ name, title, description, spec }\`. The spec is a single JSON object (not a stream of patches):
 
 \`\`\`json
 {
@@ -304,41 +292,67 @@ An app is \`{ name, title, description, spec, onLoad }\`. The spec is a single J
     "page": { "type": "Stack", "props": { "direction": "vertical", "gap": "lg" }, "children": ["title"] },
     "title": { "type": "Heading", "props": { "text": "Hello" }, "children": [] }
   },
-  "state": { }
+  "state": { },
+  "queries": { },
+  "mutations": { }
 }
 \`\`\`
 
 - elements is a flat map of key → { type, props, children, visible?, repeat?, on?, watch?, slots? }. Every element needs a children array ([] for leaves) and every child key must exist.
 - type must be a component listed below and props must match its props. Optional props can be omitted.
-- state is the initial state model. Seed every path the UI reads (empty arrays for lists, "" for inputs, false for flags). Do not invent sample data: real data comes from scripts.
+- state is the initial state model for what the user edits: form fields, filters, selections, tabs. Seed every path the UI binds ("" for inputs, false for flags). Do not put script results or sample data in it: data comes from queries.
 - The page already shows the app title and description as a heading, so start the spec with content.
 
-## Running scripts from an app
+## Queries and mutations
 
-Bind the runScript action to events (on), state changes (watch) or app load (onLoad):
+Apps run scripts through named queries (data the app reads) and mutations (changes it makes), declared in the spec:
 
 \`\`\`json
-{ "action": "runScript", "params": { "script": "list-issues", "input": { "state": { "$state": "/filter" } }, "statePath": "/issues", "loadingPath": "/loading", "errorPath": "/error" } }
+{
+  "queries": {
+    "issues": { "script": "list-issues", "input": { "state": { "$state": "/filter" } } }
+  },
+  "mutations": {
+    "createIssue": { "script": "create-issue", "input": { "$state": "/form" }, "invalidates": ["issues"] }
+  }
+}
 \`\`\`
 
-- input values can be expressions: { "$state": "/form" } sends a whole form object, { "$item": "id" } sends a field of the current repeat item.
-- The return value is written to statePath; display it with { "$state": "/issues" }, repeat over it, or feed it to Chart, DataTable or Metric.
-- on.<event>, watch.<path> and onSuccess accept a list of actions, run in order. A failing (or cancelled) action stops the list, so [runScript create, runScript reload, toast] only reloads and toasts after a successful create.
+Queries:
+- Run when the app opens, and again whenever a { "$state": "/path" } in their input changes. There is no need to reload them by hand.
+- Their state is at /queries/<name>: { status: "pending" | "success" | "error" | "idle", data, error, isFetching }.
+- Read the result with { "$state": "/queries/<name>/data" } (or a path inside it), repeat over it, or pass it to DataTable, Chart or Metric.
+- Anything that reads /queries/<name>/data must be inside a Query element for that query: { "type": "Query", "props": { "query": "<name>" }, "children": [...] }. It shows a skeleton while loading and an error with a retry button on failure, and renders its children once data is in. Put a Query around each section that needs the data.
+- "enabled": a condition (same syntax as visible) that must hold for the query to run, e.g. { "$state": "/selected" } for a detail query. While disabled the status is "idle" and the Query element renders nothing.
+- "refetchInterval": poll every this many milliseconds (at least 1000).
+- Inputs can only use { "$state": "/path" } expressions, including other queries' data for dependent queries.
+
+Mutations:
+- Run with the mutate action: { "action": "mutate", "params": { "mutation": "createIssue" } }.
+- "input" in the mutation is resolved when it runs; "input" in the mutate params is merged over it. Pass row values from the action: { "action": "mutate", "params": { "mutation": "closeIssue", "input": { "id": { "$item": "id" } } } }.
+- "invalidates" lists the queries to refetch after it succeeds.
+- Their state is at /mutations/<name>: { status: "idle" | "pending" | "success" | "error", data, error, isPending }. Disable a button while it runs with "disabled": { "$state": "/mutations/<name>/isPending" }.
+- A failure shows an error toast and stops the rest of the action list, so [mutate, setState reset, toast] only resets and toasts after a success.
+- "validate": true in the mutate params validates every form field first and stops if any is invalid.
+
+/queries and /mutations are read-only: don't bind inputs to them or setState into them, and don't declare them in state.
+
+## Actions
+
+- on.<event> and watch.<path> accept one action or a list, run in order. A failing (or cancelled) action stops the list.
 - Add "confirm": { "title", "message" } to any action binding to ask first (use it for deletes).
-- Without errorPath a failure shows an error toast. With it, the message is written to state so you can show an Alert with visible: { "$state": "/error" }.
+- Built-in actions (setState, pushState, removeState, validateForm) change local state; toast shows a notification.
 
 ## Patterns
 
-- Empty states: a Text with visible: [{ "$state": "/loading", "not": true }, { "$state": "/items/0", "not": true }].
-- Load on open: onLoad runs its actions in order when the app opens. Show a Spinner or Skeleton with visible: { "$state": "/loading" } using loadingPath.
-- Forms: bind inputs with { "$bindState": "/form/<field>" }, add checks for validation, and submit with a Button whose on.press is [runScript with "validate": true and "input": { "$state": "/form" }, setState to reset /form, runScript to reload, toast].
-- Row actions: RowTable with repeat over the array and a RowTableRow child; buttons in the row pass { "$item": "id" } to runScript.
-- Master/detail: DataTable with "selected": { "$bindState": "/selected" } and a watch on "/selected" that runs a get script with input { "id": { "$state": "/selected/id" } }; show details with visible: { "$state": "/selected" }.
-- Filters and search: bind a Select/Input to /filter and either watch "/filter" or press a Search button to rerun the list script with the filter as input.
-- Edit dialogs: DataTable with "selected": { "$bindState": "/selected" } and on.select running setState { "statePath": "/editing", "value": true }; a Dialog with openPath "/editing" holds inputs bound to /selected/<field>; Save runs the update script with "input": { "$state": "/selected" }, then setState /editing false and reloads.
+- Empty states: inside the Query, a Text with visible: { "$state": "/queries/items/data/0", "not": true }.
+- Forms: bind inputs with { "$bindState": "/form/<field>" }, add checks for validation, and submit with a Button whose on.press is [mutate with "validate": true, setState to reset /form, toast]. The mutation's input is { "$state": "/form" } and it invalidates the list query.
+- Row actions: RowTable with "repeat": { "statePath": "/queries/items/data", "key": "id" } and a RowTableRow child; buttons in the row run mutate with "input": { "id": { "$item": "id" } }.
+- Master/detail: DataTable with "selected": { "$bindState": "/selected" }, and a detail query with "input": { "id": { "$state": "/selected/id" } } and "enabled": { "$state": "/selected" }, shown in its own Query element.
+- Filters and search: bind a Select/Input to /filter and use { "$state": "/filter" } in the query input; the query refetches when it changes.
+- Edit dialogs: DataTable with "selected": { "$bindState": "/selected" } and on.select running setState { "statePath": "/editing", "value": true }; a Dialog with openPath "/editing" holds inputs bound to /selected/<field> (edits change /selected, not the query data); Save runs mutate with "input": { "$state": "/selected" }, then setState /editing false.
 - Note: a top-level { "$item": "field" } action param resolves to the item's state path, not its value; nest it (e.g. "input": { "id": { "$item": "id" } }) to pass the value.
 - Pages: Tabs with value { "$bindState": "/tab" } and sections with visible conditions, or Link to another app at "/apps/<name>".
-- Disable a button while a script runs: "disabled": { "$state": "/saving" } with "loadingPath": "/saving".
 
 ## Complete example
 

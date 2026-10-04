@@ -13,11 +13,15 @@ import {
 import {
   type ActionBinding,
   type App,
+  type AppSpec,
+  type MutationState,
+  mutateParams,
   runScriptParams,
   toastParams,
 } from '@template/api/ui'
+import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   AlertDialog,
@@ -30,11 +34,20 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { executeScript } from '@/lib/mcp'
+import {
+  AppQueriesProvider,
+  initialAppState,
+  QueryRunners,
+  resolveInput,
+  scriptQueryKey,
+} from './queries'
 import { registry } from './registry'
 
 type Validation = ReturnType<typeof useOptionalValidation>
 
 const runScriptInput = runScriptParams.partial().required({ script: true })
+
+const mutateInput = mutateParams.partial().required({ mutation: true })
 
 const toastInput = toastParams.partial().required({ message: true })
 
@@ -46,9 +59,81 @@ class ActionStoppedError extends Error {
   name = 'ActionStoppedError'
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 /** Handlers for the catalog's custom actions; json-render runs the built-ins. */
-function createHandlers(store: StateStore, getValidation: () => Validation) {
+function createHandlers({
+  spec,
+  store,
+  queryClient,
+  getValidation,
+}: {
+  spec: AppSpec
+  store: StateStore
+  queryClient: QueryClient
+  getValidation: () => Validation
+}) {
+  // Runs in flight per mutation, so isPending stays true until all settle.
+  const inFlight = new Map<string, number>()
+
   return {
+    mutate: async (params: Record<string, unknown>) => {
+      const { mutation: name, input, validate } = mutateInput.parse(params)
+      const mutation = spec.mutations?.[name]
+
+      if (!mutation) {
+        throw new Error(`No mutation named "${name}"`)
+      }
+
+      if (validate && getValidation()?.validateAll() === false) {
+        throw new ActionStoppedError('Some fields are invalid')
+      }
+
+      const path = `/mutations/${name}`
+      const base = resolveInput(mutation.input, store.getSnapshot())
+      const merged =
+        isRecord(base) && isRecord(input)
+          ? { ...base, ...input }
+          : (input ?? base)
+
+      function settle(state: Omit<MutationState, 'isPending'>) {
+        const count = (inFlight.get(name) ?? 1) - 1
+        inFlight.set(name, count)
+        store.set(path, { ...state, isPending: count > 0 })
+      }
+
+      inFlight.set(name, (inFlight.get(name) ?? 0) + 1)
+      store.set(path, {
+        status: 'pending',
+        data: null,
+        error: null,
+        isPending: true,
+      } satisfies MutationState)
+
+      try {
+        const data = await executeScript(mutation.script, merged)
+        settle({ status: 'success', data, error: null })
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+
+        settle({ status: 'error', data: null, error: message })
+        toast.error(`${name} failed`, { description: message })
+        throw new ActionStoppedError(message, { cause: error })
+      }
+
+      // Refetch in the background; the rest of the action list doesn't wait.
+      for (const query of mutation.invalidates ?? []) {
+        const script = spec.queries?.[query]?.script
+
+        if (script) {
+          void queryClient.invalidateQueries({
+            queryKey: scriptQueryKey(script),
+          })
+        }
+      }
+    },
     runScript: async (params: Record<string, unknown>) => {
       const { script, input, statePath, loadingPath, errorPath, validate } =
         runScriptInput.parse(params)
@@ -163,6 +248,7 @@ function ConfirmAction() {
 
 function AppActions({ app, store }: { app: App; store: StateStore }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const validation = useOptionalValidation()
   const validationRef = useRef(validation)
   validationRef.current = validation
@@ -170,22 +256,51 @@ function AppActions({ app, store }: { app: App; store: StateStore }) {
   // ActionProvider keeps the first handlers it gets, so they read the
   // latest validation context through a ref.
   const [handlers] = useState(() =>
-    createHandlers(store, () => validationRef.current),
+    createHandlers({
+      spec: app.spec,
+      store,
+      queryClient,
+      getValidation: () => validationRef.current,
+    }),
+  )
+
+  const queries = useMemo(
+    () => ({
+      refetch: (name: string) => {
+        const script = app.spec.queries?.[name]?.script
+
+        if (script) {
+          void queryClient.refetchQueries({
+            queryKey: scriptQueryKey(script),
+            type: 'active',
+          })
+        }
+      },
+    }),
+    [app.spec, queryClient],
   )
 
   return (
     <ActionProvider handlers={handlers} navigate={(to) => navigate({ to })}>
-      <Renderer spec={app.spec} registry={registry} />
+      <AppQueriesProvider value={queries}>
+        <Renderer spec={app.spec} registry={registry} />
+      </AppQueriesProvider>
+      <QueryRunners spec={app.spec} store={store} />
       <OnLoad bindings={app.onLoad} store={store} />
       <ConfirmAction />
     </ActionProvider>
   )
 }
 
-/** Renders an app's json-render spec; its actions run scripts over MCP. */
+/**
+ * Renders an app's json-render spec. Its queries and actions run scripts over
+ * MCP, and query and mutation results are kept in state under `/queries` and
+ * `/mutations`.
+ */
 export function AppRenderer({ app }: { app: App }) {
+  const queryClient = useQueryClient()
   const [store] = useState(() =>
-    createStateStore(structuredClone(app.spec.state ?? {})),
+    createStateStore(initialAppState(app.spec, queryClient)),
   )
 
   // json-render doesn't catch failed event handlers, so a stopped action list

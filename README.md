@@ -57,16 +57,18 @@ to the MCP server when those are set. `apps/server` reads the repo-root
 
 An app is a [json-render](https://json-render.dev) spec — a flat JSON tree of
 shadcn/ui components with state, visibility conditions and event bindings —
-served by the frontend at `/apps/<name>`. Its buttons, forms, watchers and
-`onLoad` hooks call scripts with the `runScript` action and render the results
-in tables, charts, metrics and forms.
+served by the frontend at `/apps/<name>`. Specs declare named queries (scripts
+that load data, refetched when their input changes) and mutations (scripts run
+by buttons and forms, which refetch the queries they invalidate). Results are
+rendered in tables, charts, metrics and forms; data is only read inside a
+`Query` element, so loading and error states are always handled.
 
 Apps are created and changed over MCP. An agent needs only the MCP URL
 (`http://127.0.0.1:8787/mcp`, or `/mcp` on the frontend origin): the server's
 instructions explain the workflow, and `get_app_guide` documents the spec
 format, every component and action, and common patterns with a full example.
 `create_app` / `update_app` validate specs (components, props, actions, script
-names and the element tree) and return readable errors.
+names, queries and mutations, and the element tree) and return readable errors.
 
 The catalog lives in `packages/api/src/ui` and is shared with the frontend as
 `@template/api/ui`.

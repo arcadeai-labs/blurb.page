@@ -111,6 +111,15 @@ export const customComponentDefinitions = {
       'One RowTable row. Each child element becomes one cell, in column order. Inside, read the current item with { "$item": "field" } and pass it to actions, e.g. a Button whose on.press runs runScript with input { "id": { "$item": "id" } }.',
     example: {},
   },
+  Query: {
+    props: z.object({
+      query: z.string(),
+    }),
+    slots: ['default'],
+    description:
+      'Boundary for a named query. Shows a skeleton while it first loads and an error with a retry button if it fails; renders its children once data is in. Elements that read /queries/<name>/data must be inside a Query for that name. Inside, read the result with { "$state": "/queries/<name>/data" } (repeat over it, or pass it to DataTable, Chart or Metric).',
+    example: { query: 'issues' },
+  },
   JsonView: {
     props: z.object({
       value: z.unknown(),
@@ -146,6 +155,12 @@ export const runScriptParams = z.object({
   validate: z.boolean().nullable(),
 })
 
+export const mutateParams = z.object({
+  mutation: z.string(),
+  input: z.unknown().nullable(),
+  validate: z.boolean().nullable(),
+})
+
 export const toastParams = z.object({
   message: z.string(),
   description: z.string().nullable(),
@@ -154,10 +169,15 @@ export const toastParams = z.object({
 
 /** Actions apps can bind on top of json-render's built-in state actions. */
 export const appActionDefinitions = {
+  mutate: {
+    params: mutateParams,
+    description:
+      'Run a named mutation from spec.mutations. Params: { mutation: string (its name), input?: object (merged over the mutation\'s input; values may be expressions such as { "$item": "id" } or { "$state": "/form" }), validate?: boolean (validate every form field first and stop if any is invalid) }. Its status is at /mutations/<name> (isPending, error, data). On success it refetches the queries listed in invalidates; a failure shows an error toast and stops the rest of an action list.',
+  },
   runScript: {
     params: runScriptParams,
     description:
-      'Run a saved script on the server and store its return value in state. Params: { script: string (script name), input?: object (validated against the script inputSchema; values may be expressions such as { "$state": "/form" } or { "$item": "id" }), statePath?: string (where to write the return value), loadingPath?: string (true while running, then false), errorPath?: string (error message on failure, null on success; without it failures show a toast), validate?: boolean (validate every form field first and stop if any is invalid) }. A failure stops the rest of an action list.',
+      'Legacy: prefer spec.queries and the mutate action. Run a saved script on the server and store its return value in state. Params: { script: string (script name), input?: object (validated against the script inputSchema; values may be expressions such as { "$state": "/form" } or { "$item": "id" }), statePath?: string (where to write the return value), loadingPath?: string (true while running, then false), errorPath?: string (error message on failure, null on success; without it failures show a toast), validate?: boolean (validate every form field first and stop if any is invalid) }. A failure stops the rest of an action list.',
   },
   toast: {
     params: toastParams,

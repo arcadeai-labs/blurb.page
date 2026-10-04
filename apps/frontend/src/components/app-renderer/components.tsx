@@ -1,5 +1,9 @@
-import { type BaseComponentProps, useBoundProp } from '@json-render/react'
-import type { customComponentDefinitions } from '@template/api/ui'
+import {
+  type BaseComponentProps,
+  useBoundProp,
+  useStateValue,
+} from '@json-render/react'
+import type { customComponentDefinitions, QueryState } from '@template/api/ui'
 import { MinusIcon, TrendingDownIcon, TrendingUpIcon } from 'lucide-react'
 import { Children } from 'react'
 import {
@@ -17,7 +21,14 @@ import {
   YAxis,
 } from 'recharts'
 import type { z } from 'zod'
+import {
+  Alert,
+  AlertAction,
+  AlertDescription,
+  AlertTitle,
+} from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import {
   Card,
   CardAction,
@@ -34,6 +45,7 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart'
+import { Skeleton } from '@/components/ui/skeleton'
 import {
   Table,
   TableBody,
@@ -43,6 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { useAppQueries } from './queries'
 
 type Definitions = typeof customComponentDefinitions
 
@@ -385,4 +398,36 @@ export function JsonView({ props }: PropsOf<'JsonView'>) {
       </CardContent>
     </Card>
   )
+}
+
+/** Renders its children once a query has data, with loading and error states. */
+export function Query({ props, children }: PropsOf<'Query'>) {
+  const query = useStateValue<QueryState>(`/queries/${props.query}`)
+  const { refetch } = useAppQueries()
+
+  switch (query?.status) {
+    case 'success':
+      return children
+    case 'pending':
+      return <Skeleton className="h-24" />
+    case 'error':
+      return (
+        <Alert variant="destructive">
+          <AlertTitle>Could not load data</AlertTitle>
+          <AlertDescription>{query.error}</AlertDescription>
+          <AlertAction>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={query.isFetching}
+              onClick={() => refetch(props.query)}
+            >
+              Retry
+            </Button>
+          </AlertAction>
+        </Alert>
+      )
+    default:
+      return null
+  }
 }
