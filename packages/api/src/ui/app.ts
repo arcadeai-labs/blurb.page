@@ -147,6 +147,8 @@ export type QueryState = {
   status: 'idle' | 'pending' | 'error' | 'success'
   data: unknown
   error: string | null
+  /** Set when the error is `AUTHORIZATION_REQUIRED`. */
+  authorizationUrl: string | null
   isFetching: boolean
 }
 

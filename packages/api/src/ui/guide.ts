@@ -296,6 +296,7 @@ A script's source is the body of an async JavaScript function, run in a sandbox 
 
 - \`input\` is a global holding the call's input, validated against the script's inputSchema first.
 - Every integration tool is \`await tools.<functionName>(args)\` (functionName from list_script_tools). Tool results come back as structured JSON when available, otherwise parsed JSON text, otherwise a string. A tool error throws.
+- When the user hasn't authorized an integration yet, its tools throw and the run fails with AUTHORIZATION_REQUIRED and an authorizationUrl. Apps prompt the user to authorize and then retry, so let that error propagate: don't catch it or return a fallback value. When execute_script returns it, show the user the link and retry once they've authorized.
 - \`return\` the output. It must be JSON-serializable; outputSchema documents its shape.
 - Shape the output for the UI: flat arrays of objects with an \`id\` for tables and lists, pre-aggregated arrays for charts (e.g. [{ "month": "Jan", "revenue": 10 }]), plain objects for metrics. Do formatting and joins in the script, not the spec.
 - Scripts are referenced by name from apps, so names are unique slugs.
@@ -347,7 +348,7 @@ Queries:
 - Run when the app opens, and again whenever a { "$state": "/path" } in their input changes. There is no need to reload them by hand.
 - Their state is at /queries/<name>: { status: "pending" | "success" | "error" | "idle", data, error, isFetching }.
 - Read the result with { "$state": "/queries/<name>/data" } (or a path inside it), repeat over it, or pass it to DataTable, Chart or Metric.
-- Anything that reads /queries/<name>/data must be inside a Query element for that query: { "type": "Query", "props": { "query": "<name>" }, "children": [...] }. It shows a skeleton while loading and an error with a retry button on failure, and renders its children once data is in. Put a Query around each section that needs the data.
+- Anything that reads /queries/<name>/data must be inside a Query element for that query: { "type": "Query", "props": { "query": "<name>" }, "children": [...] }. It shows a skeleton while loading, an error with a retry button on failure (with an Authorize button when an integration needs authorization), and renders its children once data is in. Put a Query around each section that needs the data.
 - "enabled": a condition (same syntax as visible) that must hold for the query to run, e.g. { "$state": "/selected" } for a detail query. While disabled the status is "idle" and the Query element renders nothing.
 - "refetchInterval": poll every this many milliseconds (at least 1000).
 - Inputs can only use { "$state": "/path" } expressions, including other queries' data for dependent queries.

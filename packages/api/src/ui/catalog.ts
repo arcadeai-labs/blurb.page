@@ -117,7 +117,7 @@ export const customComponentDefinitions = {
     }),
     slots: ['default'],
     description:
-      'Boundary for a named query. Shows a skeleton while it first loads and an error with a retry button if it fails; renders its children once data is in. Elements that read /queries/<name>/data must be inside a Query for that name. Inside, read the result with { "$state": "/queries/<name>/data" } (repeat over it, or pass it to DataTable, Chart or Metric).',
+      'Boundary for a named query. Shows a skeleton while it first loads and an error with a retry button if it fails (plus an Authorize button when an integration needs authorization); renders its children once data is in. Elements that read /queries/<name>/data must be inside a Query for that name. Inside, read the result with { "$state": "/queries/<name>/data" } (repeat over it, or pass it to DataTable, Chart or Metric).',
     example: { query: 'issues' },
   },
   ScrollArea: {

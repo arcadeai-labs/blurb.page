@@ -2,17 +2,20 @@ import { createRunner, RunError } from 'run'
 import { z } from 'zod'
 
 import { mcpHostFunctions, withMcpClient } from './mcp'
+import { authorizationRequired, type ScriptError } from './script-error'
 
 const runner = createRunner({ limits: { timeoutMs: 60_000 } })
 
 export type ExecuteResult =
   | { ok: true; value: unknown }
-  | { ok: false; error: { code: string; message: string } }
+  | { ok: false; error: ScriptError }
 
 /**
  * Runs a script in the QuickJS sandbox with `input` as a global and the MCP
  * server's tools available as `tools.*`. Invalid input and guest failures
- * come back as `ok: false`, not as exceptions.
+ * come back as `ok: false`, not as exceptions. A failed run whose tool call
+ * needed authorization is reported as `AUTHORIZATION_REQUIRED`, even if the
+ * script caught and rethrew the tool's error.
  */
 export async function executeScript(
   script: { source: string; inputSchema: Record<string, unknown> },
@@ -32,10 +35,16 @@ export async function executeScript(
   const source = `const input = ${JSON.stringify(parsed.data ?? null)};\n${script.source}`
 
   return withMcpClient(async (client) => {
+    let authorization: { toolName: string; url: string } | undefined
+
     try {
       const result = await runner.run({
         source,
-        hostFunctions: { tools: await mcpHostFunctions(client) },
+        hostFunctions: {
+          tools: await mcpHostFunctions(client, (toolName, url) => {
+            authorization ??= { toolName, url }
+          }),
+        },
         abortSignal,
       })
 
@@ -52,13 +61,25 @@ export async function executeScript(
         value: JSON.parse(JSON.stringify(result.value ?? null)),
       }
     } catch (error) {
-      if (error instanceof RunError) {
+      if (!(error instanceof RunError)) {
+        throw error
+      }
+
+      if (authorization) {
         return {
           ok: false,
-          error: { code: error.code, message: error.message },
+          error: {
+            code: authorizationRequired,
+            message: `${authorization.toolName} needs your authorization. Authorize it, then try again.`,
+            authorizationUrl: authorization.url,
+          },
         }
       }
-      throw error
+
+      return {
+        ok: false,
+        error: { code: error.code, message: error.message },
+      }
     }
   })
 }

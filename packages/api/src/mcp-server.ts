@@ -17,6 +17,7 @@ import { apps, docs, type Script, scripts } from './db/schema'
 import { docErrors, docsRunning, toDocJson, toDocSummary } from './docs'
 import { executeScript } from './execute'
 import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
+import type { ScriptError } from './script-error'
 import { scriptFields, scriptName } from './script-fields'
 import { appFields, appName } from './ui/app'
 import { docFields, docName } from './ui/doc'
@@ -40,6 +41,18 @@ function ok(value: Record<string, unknown>): CallToolResult {
 
 function fail(message: string): CallToolResult {
   return { content: [{ type: 'text', text: message }], isError: true }
+}
+
+/**
+ * Reports a failed script run, with the error as structured content too so
+ * clients can tell an authorization prompt from other failures.
+ */
+function scriptFailed(error: ScriptError): CallToolResult {
+  const text = error.authorizationUrl
+    ? `${error.code}: ${error.message} Show the user this link to authorize, then retry: ${error.authorizationUrl}`
+    : `${error.code}: ${error.message}`
+
+  return { ...fail(text), structuredContent: { error } }
 }
 
 const scriptNotFound = () => fail('Script not found')
@@ -314,7 +327,7 @@ function createMcpServer(baseUrl: string) {
     'execute_script',
     {
       description:
-        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the upstream MCP server (`MCP_URL`) is available to it as `tools.<functionName>(args)`. Returns `{ value }`.',
+        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the upstream MCP server (`MCP_URL`) is available to it as `tools.<functionName>(args)`. Returns `{ value }`. If a tool needs the user to authorize it first, it fails with AUTHORIZATION_REQUIRED and a link to show the user.',
       inputSchema: {
         id: scriptId.optional(),
         name: scriptName.optional(),
@@ -343,7 +356,7 @@ function createMcpServer(baseUrl: string) {
 
         return result.ok
           ? ok({ value: result.value })
-          : fail(`${result.error.code}: ${result.error.message}`)
+          : scriptFailed(result.error)
       })
     },
   )

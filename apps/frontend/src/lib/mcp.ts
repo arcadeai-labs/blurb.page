@@ -5,6 +5,7 @@ import {
   appSummarySchema,
   docSchema,
   docSummarySchema,
+  scriptErrorSchema,
 } from '@template/api/ui'
 import { z } from 'zod'
 
@@ -35,7 +36,23 @@ const textContent = z.array(
   z.object({ type: z.string(), text: z.string().optional() }),
 )
 
-/** Calls a tool and parses its structured result, throwing on tool errors. */
+const scriptFailure = z.object({ error: scriptErrorSchema })
+
+/** A script failed because the user hasn't authorized a tool it calls yet. */
+export class AuthorizationRequiredError extends Error {
+  name = 'AuthorizationRequiredError'
+  readonly authorizationUrl: string
+
+  constructor(message: string, authorizationUrl: string) {
+    super(message)
+    this.authorizationUrl = authorizationUrl
+  }
+}
+
+/**
+ * Calls a tool and parses its structured result, throwing on tool errors
+ * (an AuthorizationRequiredError when a script needs authorization).
+ */
 async function callTool<T extends z.ZodType>(
   name: string,
   args: Record<string, unknown>,
@@ -45,6 +62,15 @@ async function callTool<T extends z.ZodType>(
   const result = await client.callTool({ name, arguments: args })
 
   if (result.isError) {
+    const failure = scriptFailure.safeParse(result.structuredContent)
+
+    if (failure.success && failure.data.error.authorizationUrl) {
+      throw new AuthorizationRequiredError(
+        failure.data.error.message,
+        failure.data.error.authorizationUrl,
+      )
+    }
+
     const content = textContent.safeParse(result.content)
     const message = content.success
       ? content.data.map((part) => part.text ?? '').join('\n')

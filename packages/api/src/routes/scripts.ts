@@ -6,6 +6,7 @@ import { isUniqueViolation } from '../db/errors'
 import { type Script, scripts } from '../db/schema'
 import { executeScript } from '../execute'
 import { McpUnavailableError } from '../mcp'
+import { scriptErrorSchema } from '../script-error'
 import { scriptFields } from '../script-fields'
 
 const scriptSchema = z
@@ -32,10 +33,7 @@ const errorSchema = z.object({ error: z.string() }).openapi('Error')
 const executeResultSchema = z
   .discriminatedUnion('ok', [
     z.object({ ok: z.literal(true), value: z.unknown() }),
-    z.object({
-      ok: z.literal(false),
-      error: z.object({ code: z.string(), message: z.string() }),
-    }),
+    z.object({ ok: z.literal(false), error: scriptErrorSchema }),
   ])
   .openapi('ExecuteResult')
 
@@ -122,7 +120,7 @@ const executeRoute = createRoute({
   path: '/{id}/execute',
   summary: 'Execute a script',
   description:
-    'Runs the script in the `run` QuickJS sandbox with `input` as a global. Every tool on the MCP server at `MCP_URL` is available as `tools.<name>(args)`. Invalid input and script failures are returned as `ok: false`.',
+    'Runs the script in the `run` QuickJS sandbox with `input` as a global. Every tool on the MCP server at `MCP_URL` is available as `tools.<name>(args)`. Invalid input and script failures are returned as `ok: false`; a tool the user has not authorized yet fails with `AUTHORIZATION_REQUIRED` and an `authorizationUrl`.',
   request: {
     params: idParams,
     body: {

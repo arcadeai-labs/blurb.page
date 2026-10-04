@@ -195,7 +195,13 @@ export function registerScriptCommands(api: Command) {
     }
 
     if (!result.ok) {
-      throw new Error(`${result.error.code}: ${result.error.message}`)
+      const { code, message, authorizationUrl } = result.error
+
+      throw new Error(
+        authorizationUrl
+          ? `${code}: ${message}\nAuthorize at ${authorizationUrl}`
+          : `${code}: ${message}`,
+      )
     }
 
     printJson(result.value)
