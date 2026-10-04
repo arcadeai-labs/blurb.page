@@ -8,6 +8,17 @@ export class McpUnavailableError extends Error {
   name = 'McpUnavailableError'
 }
 
+/**
+ * Gateways in discovery mode (like Arcade's global gateway) list only Arcade's
+ * meta-tools (`Arcade_SelectTools`, `Arcade_UseTool`) instead of their tools.
+ * Scripts call tools by name, so every gateway is asked for its tools as-is.
+ */
+export function gatewayUrl(url: string) {
+  const withOptions = new URL(url)
+  withOptions.searchParams.set('tool_recommendation', 'false')
+  return withOptions
+}
+
 /** An MCP gateway, and the user's Arcade token to call it with. */
 export type McpConnection = { url: string; accessToken: string }
 
@@ -23,7 +34,7 @@ export async function withMcpClient<T>(
 
   try {
     await client.connect(
-      new StreamableHTTPClientTransport(new URL(url), {
+      new StreamableHTTPClientTransport(gatewayUrl(url), {
         requestInit: { headers: { Authorization: `Bearer ${accessToken}` } },
       }),
     )
