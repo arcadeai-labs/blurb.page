@@ -82,10 +82,12 @@ function Apps() {
                 <CardDescription>{app.description}</CardDescription>
               </CardHeader>
               <CardFooter>
-                <Button variant="outline" asChild>
-                  <Link to="/apps/$name" params={{ name: app.name }}>
-                    Open
-                  </Link>
+                <Button
+                  variant="outline"
+                  nativeButton={false}
+                  render={<Link to="/apps/$name" params={{ name: app.name }} />}
+                >
+                  Open
                 </Button>
               </CardFooter>
             </Card>
