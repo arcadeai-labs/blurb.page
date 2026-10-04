@@ -16,7 +16,10 @@ const svg = svgSchema
   })
   .openapi('Svg')
 
-const svgSummary = svgSummarySchema.openapi('SvgSummary')
+// Only schemas made after @hono/zod-openapi has patched zod have .openapi(),
+// and the production bundle can create the shared ones in ../svg-fields
+// before that, so build route schemas here from their shapes.
+const svgSummary = z.object(svgSummarySchema.shape).openapi('SvgSummary')
 
 const createSvgSchema = z.object(svgFields).openapi('CreateSvg')
 
