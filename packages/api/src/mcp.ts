@@ -106,13 +106,28 @@ function toolResultValue(
   }
 }
 
+/** The tool functions a script calls, like `Gmail_SendEmail` in `tools.Gmail_SendEmail(…)`. */
+export function calledToolNames(source: string) {
+  return new Set(
+    Array.from(
+      source.matchAll(/\btools\s*\.\s*([A-Za-z_$][\w$]*)/g),
+      (match) => match[1],
+    ),
+  )
+}
+
+/** The gateway tool that runs any Arcade tool by name, on discovery gateways. */
+const useToolName = 'Arcade_UseTool'
+
 /**
- * Exposes every tool on the MCP server as `tools.<functionName>(args)`. A tool
- * that needs authorization throws, and its URL goes to `onAuthorizationRequired`
- * (`run` doesn't pass error details through the sandbox).
+ * Exposes every tool on the MCP server as `tools.<functionName>(args)`.
+ * Gateways in discovery mode only list Arcade's meta-tools, so a tool the
+ * script calls (`called`) that isn't listed runs through `Arcade_UseTool`,
+ * which takes the same `Toolkit_Tool` name and returns the same result.
  */
 export async function mcpHostFunctions(
   client: Client,
+  called: Iterable<string>,
   onAuthorizationRequired: (toolName: string, url: string) => void,
 ): Promise<HostFunctionGroup> {
   const { tools } = await client.listTools()
@@ -127,6 +142,20 @@ export async function mcpHostFunctions(
         await client.callTool({ name: tool.name, arguments: args }),
         onAuthorizationRequired,
       )
+  }
+
+  if (tools.some((tool) => tool.name === useToolName)) {
+    for (const name of called) {
+      functions[name] ??= async (args: Record<string, unknown> = {}) =>
+        toolResultValue(
+          name,
+          await client.callTool({
+            name: useToolName,
+            arguments: { tool_name: name, inputs: args },
+          }),
+          onAuthorizationRequired,
+        )
+    }
   }
 
   return functions

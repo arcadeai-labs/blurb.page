@@ -71,7 +71,10 @@ with a preview database: the integration matches Neon branches by name.
 runs one in the `run` QuickJS sandbox. Every tool on the user's MCP gateway
 is exposed to scripts as `tools.<functionName>(args)`. Names are made
 into valid identifiers, so `Gmail.ListEmails` becomes `tools.Gmail_ListEmails`.
-`GET /api/tools` lists them.
+`GET /api/tools` lists them. Gateways in discovery mode (like Arcade's global
+gateway) only list Arcade's meta-tools; on those, a script can still call any
+Arcade tool directly as `tools.<Toolkit>_<Tool>(inputs)`, and it runs through
+`Arcade_UseTool`.
 
 ```js
 const emails = await tools.Gmail_ListEmails({ n_emails: input.count })
