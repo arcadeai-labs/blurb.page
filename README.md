@@ -92,7 +92,11 @@ pnpm cli api scripts execute <id> --input '{"count": 5}'
 
 `pnpm dev` is `pnpm cli dev`: it starts the portless HTTPS proxy, registers the
 branch's alias for each app, runs each app's own `dev` script behind it, waits for the URL to
-answer and opens it in a browser, then removes the alias on exit. Running an
+answer and opens it in a browser, then removes the alias on exit. When it starts
+the API server, it also points the `every-ui` entry in the repo's `.mcp.json` at
+that server's MCP endpoint (`http://127.0.0.1:8787/mcp`), so MCP clients opened in
+the checkout, like Claude Code, use it. Other entries are kept, and it uses the
+loopback URL because Node-based clients don't trust the portless CA. Running an
 app's `dev` script directly (`pnpm --filter @template/frontend dev`) skips
 portless and serves plain HTTP on the app's port.
 
