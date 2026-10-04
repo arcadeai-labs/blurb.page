@@ -22,7 +22,6 @@ import {
 import { type QueryClient, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from '@tanstack/react-router'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,6 +32,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { toast } from '@/components/ui/toast'
 import { executeScript } from '@/lib/mcp'
 import {
   AppQueriesProvider,
@@ -119,7 +119,11 @@ function createHandlers({
         const message = error instanceof Error ? error.message : String(error)
 
         settle({ status: 'error', data: null, error: message })
-        toast.error(`${name} failed`, { description: message })
+        toast.add({
+          title: `${name} failed`,
+          description: message,
+          type: 'error',
+        })
         throw new ActionStoppedError(message, { cause: error })
       }
 
@@ -155,7 +159,11 @@ function createHandlers({
         if (errorPath) {
           store.set(errorPath, message)
         } else {
-          toast.error(`${script} failed`, { description: message })
+          toast.add({
+            title: `${script} failed`,
+            description: message,
+            type: 'error',
+          })
         }
         throw new ActionStoppedError(message, { cause: error })
       } finally {
@@ -164,16 +172,11 @@ function createHandlers({
     },
     toast: (params: Record<string, unknown>) => {
       const { message, description, type } = toastInput.parse(params)
-      const show =
-        type === 'success'
-          ? toast.success
-          : type === 'error'
-            ? toast.error
-            : type === 'info'
-              ? toast.info
-              : toast
-
-      show(message, { description: description ?? undefined })
+      toast.add({
+        title: message,
+        description: description ?? undefined,
+        type: type ?? undefined,
+      })
     },
   }
 }

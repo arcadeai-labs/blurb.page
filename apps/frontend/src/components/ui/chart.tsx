@@ -1,10 +1,9 @@
-'use client'
-
 import * as React from 'react'
+import { cn } from 'cn'
+
+import { cssVariables } from '@/lib/utils'
 import * as RechartsPrimitive from 'recharts'
 import type { TooltipValueType } from 'recharts'
-
-import { cn } from '@/lib/utils'
 
 // Format: { THEME_NAME: CSS_SELECTOR }
 const THEMES = { light: '', dark: '.dark' } as const
@@ -17,13 +16,6 @@ const THEME_ENTRIES: Array<
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const
 type TooltipNameType = number | string
-type CSSVariableProperties = Record<`--${string}`, string | number | undefined>
-
-function cssVariables<T extends CSSVariableProperties>(
-  variables: T,
-): React.CSSProperties {
-  return { ...variables }
-}
 
 export type ChartConfig = Record<
   string,
@@ -78,7 +70,7 @@ function ChartContainer({
         data-slot="chart"
         data-chart={chartId}
         className={cn(
-          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-border/50 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-border [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-border [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-border [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
+          "flex aspect-video justify-center text-xs [&_.recharts-cartesian-axis-tick_text]:fill-muted-foreground [&_.recharts-cartesian-grid_line[stroke='#ccc']]:stroke-line/70 [&_.recharts-curve.recharts-tooltip-cursor]:stroke-line [&_.recharts-dot[stroke='#fff']]:stroke-transparent [&_.recharts-layer]:outline-hidden [&_.recharts-polar-grid_[stroke='#ccc']]:stroke-line [&_.recharts-radial-bar-background-sector]:fill-muted [&_.recharts-rectangle.recharts-tooltip-cursor]:fill-muted [&_.recharts-reference-line_[stroke='#ccc']]:stroke-line [&_.recharts-sector]:outline-hidden [&_.recharts-sector[stroke='#fff']]:stroke-transparent [&_.recharts-surface]:outline-hidden",
           className,
         )}
         {...props}
@@ -200,7 +192,7 @@ function ChartTooltipContent({
   return (
     <div
       className={cn(
-        'grid min-w-32 items-start gap-1.5 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl',
+        'grid min-w-32 items-start gap-1.5 rounded-lg bg-popover text-popover-foreground px-2.5 py-1.5 text-xs shadow-xl',
         className,
       )}
     >
@@ -231,7 +223,7 @@ function ChartTooltipContent({
                       !hideIndicator && (
                         <div
                           className={cn(
-                            'shrink-0 rounded-[2px] border-(--color-border) bg-(--color-bg)',
+                            'shrink-0 rounded-none border-(--color-border) bg-(--color-bg)',
                             {
                               'h-2.5 w-2.5': indicator === 'dot',
                               'w-1': indicator === 'line',
@@ -320,7 +312,7 @@ function ChartLegendContent({
                 <itemConfig.icon />
               ) : (
                 <div
-                  className="h-2 w-2 shrink-0 rounded-[2px]"
+                  className="h-2 w-2 shrink-0 rounded-none"
                   style={{
                     backgroundColor: item.color,
                   }}
@@ -359,7 +351,7 @@ function getPayloadConfigFromPayload(
 
   if (typeof payloadValue === 'string') {
     configLabelKey = payloadValue
-  } else if (payloadPayload && typeof payloadPayloadValue === 'string') {
+  } else if (typeof payloadPayloadValue === 'string') {
     configLabelKey = payloadPayloadValue
   }
 

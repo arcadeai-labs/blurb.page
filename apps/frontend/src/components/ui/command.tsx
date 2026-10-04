@@ -1,7 +1,9 @@
+'use client'
+
 import * as React from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
+import { cn } from 'cn'
 
-import { cn } from '@/lib/utils'
 import {
   Dialog,
   DialogContent,
@@ -35,11 +37,12 @@ function CommandDialog({
   className,
   showCloseButton = false,
   ...props
-}: React.ComponentProps<typeof Dialog> & {
+}: Omit<React.ComponentProps<typeof Dialog>, 'children'> & {
   title?: string
   description?: string
   className?: string
   showCloseButton?: boolean
+  children: React.ReactNode
 }) {
   return (
     <Dialog {...props}>
@@ -66,7 +69,7 @@ function CommandInput({
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
     <div data-slot="command-input-wrapper" className="p-1 pb-0">
-      <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
+      <InputGroup className="h-8! rounded-lg! border-input/30 bg-field shadow-none! *:data-[slot=input-group-addon]:pl-2!">
         <CommandPrimitive.Input
           data-slot="command-input"
           className={cn(
@@ -135,7 +138,7 @@ function CommandSeparator({
   return (
     <CommandPrimitive.Separator
       data-slot="command-separator"
-      className={cn('-mx-1 h-px bg-border', className)}
+      className={cn('-mx-1 h-px bg-line', className)}
       {...props}
     />
   )

@@ -1,7 +1,14 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
-@import "@fontsource-variable/geist";
+@import "@fontsource/atkinson-hyperlegible/400.css";
+@import "@fontsource/atkinson-hyperlegible/400-italic.css";
+@import "@fontsource/atkinson-hyperlegible/700.css";
+@import "@fontsource/atkinson-hyperlegible/700-italic.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+@import "@fontsource/ibm-plex-mono/700.css";
 
 /* Classes used by @json-render/shadcn, which renders app specs. */
 @source "../node_modules/@json-render/shadcn/dist";
@@ -10,7 +17,7 @@
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: "Geist Variable", sans-serif;
+  --color-sidebar-line: var(--sidebar-line);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -24,6 +31,8 @@
   --color-chart-3: var(--chart-3);
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
+  --color-line: var(--line);
+  --color-field: var(--field);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -49,50 +58,64 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  --font-sans: "Atkinson Hyperlegible", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
 :root {
+  /* Surfaces that used to be outlined are now identified by fill, not by a
+       line. --surface is that fill (#eceae7) and is identical in both themes;
+       --surface-raised steps one shade off it for nested fills. */
+  --surface: oklch(0.938 0.0046 78.3);
+  --surface-raised: oklch(0.86 0.005 78.3);
+  --surface-foreground: oklch(0.145 0 0);
+  --surface-muted-foreground: oklch(0.505 0 0);
+  --surface-line: oklch(0 0 0 / 12%);
+
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
+  --card: var(--surface);
+  --card-foreground: var(--surface-foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--surface-foreground);
   --primary: oklch(0.205 0 0);
   --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
+  --secondary: oklch(0.9 0 0);
   --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
+  --muted: oklch(0.9 0 0);
+  --muted-foreground: oklch(0.505 0 0);
+  --accent: oklch(0.9 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
+  --border: transparent;
+  --input: transparent;
+  --line: oklch(0.922 0 0);
+  --field: var(--surface);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
+  --radius: 0rem;
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--surface-foreground);
   --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-accent: var(--surface-raised);
+  --sidebar-accent-foreground: var(--surface-foreground);
+  --sidebar-border: transparent;
+  --sidebar-line: var(--surface-line);
   --sidebar-ring: oklch(0.708 0 0);
 }
 
 .dark {
   --background: oklch(0.145 0 0);
   --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
+  --card: var(--surface);
+  --card-foreground: var(--surface-foreground);
+  --popover: var(--surface);
+  --popover-foreground: var(--surface-foreground);
   --primary: oklch(0.922 0 0);
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
@@ -102,21 +125,24 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 15%);
+  --border: transparent;
+  --input: transparent;
+  --line: oklch(1 0 0 / 10%);
+  --field: var(--surface);
   --ring: oklch(0.556 0 0);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
   --chart-3: oklch(0.439 0 0);
   --chart-4: oklch(0.371 0 0);
   --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar: var(--surface);
+  --sidebar-foreground: var(--surface-foreground);
+  --sidebar-primary: oklch(0.205 0 0);
   --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-accent: var(--surface-raised);
+  --sidebar-accent-foreground: var(--surface-foreground);
+  --sidebar-border: transparent;
+  --sidebar-line: var(--surface-line);
   --sidebar-ring: oklch(0.556 0 0);
 }
 
@@ -129,5 +155,48 @@
   }
   html {
     @apply font-sans;
+  }
+}
+@layer base {
+  /* The surface fill is the same near-black in both themes, so anything
+     rendered inside one needs the dark interior palette regardless of theme.
+     Re-binding the tokens on the surface itself means every nested component
+     inherits it without any component needing to know it is on a surface. */
+  .bg-card,
+  .bg-popover,
+  .bg-sidebar {
+    --foreground: var(--surface-foreground);
+    --muted: var(--surface-raised);
+    --muted-foreground: var(--surface-muted-foreground);
+    --accent: var(--surface-raised);
+    --accent-foreground: var(--surface-foreground);
+    --secondary: var(--surface-raised);
+    --secondary-foreground: var(--surface-foreground);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --ring: oklch(0.708 0 0);
+    --line: var(--surface-line);
+    /* Nested fields step off the surface so they stay readable on it. */
+    --field: var(--surface-raised);
+  }
+
+  /* A field is itself a surface and needs the same interior palette -- a
+     checked checkbox paints --primary on it, which would otherwise be the
+     dark theme's near-white on near-white. It must NOT re-bind --field
+     though: its own background resolves from that token. */
+  .bg-field {
+    --foreground: var(--surface-foreground);
+    --muted: var(--surface-raised);
+    --muted-foreground: var(--surface-muted-foreground);
+    --accent: var(--surface-raised);
+    --accent-foreground: var(--surface-foreground);
+    --secondary: var(--surface-raised);
+    --secondary-foreground: var(--surface-foreground);
+    --primary: oklch(0.205 0 0);
+    --primary-foreground: oklch(0.985 0 0);
+    --destructive: oklch(0.577 0.245 27.325);
+    --ring: oklch(0.708 0 0);
+    --line: var(--surface-line);
   }
 }

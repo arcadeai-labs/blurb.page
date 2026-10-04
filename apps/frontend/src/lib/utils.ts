@@ -1,6 +1,10 @@
-import { clsx, type ClassValue } from 'clsx'
-import { twMerge } from 'tailwind-merge'
+import type { CSSProperties } from 'react'
 
-export function cn(...inputs: ClassValue[]) {
-  return twMerge(clsx(inputs))
+export { cn } from 'cn'
+
+type CSSVariableProperties = Record<`--${string}`, string | number | undefined>
+
+/** Typed inline CSS custom properties, without a type assertion. */
+export function cssVariables(variables: CSSVariableProperties): CSSProperties {
+  return { ...variables }
 }
