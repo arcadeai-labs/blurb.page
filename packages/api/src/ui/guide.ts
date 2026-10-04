@@ -359,7 +359,9 @@ An app should fit in the browser window like a desktop app: the page itself shou
 1. list_script_tools — the integration tools scripts can call (and their input schemas).
 2. create_script — one script per data operation the app needs (list, get, create, update, delete, aggregate for a chart…). Test each with execute_script before wiring it into a UI.
 3. create_app — the spec: its elements, plus the queries that load data and the mutations that change it. The response has the app URL. It is rejected with a list of errors if anything is invalid; fix them and retry.
-4. Iterate with get_app / update_app (send the whole spec) / delete_app, and list_apps / list_scripts to see what exists.
+4. Iterate with get_app / update_app (send the whole spec) / delete_app, and list_apps / list_scripts / list_svgs to see what exists.
+
+Images (diagrams, illustrations, icons) are SVGs saved with create_svg and shown by name with the Svg component; see SVGs.
 
 ## Scripts
 
@@ -451,11 +453,26 @@ Mutations:
 - Note: a top-level { "$item": "field" } action param resolves to the item's state path, not its value; nest it (e.g. "input": { "id": { "$item": "id" } }) to pass the value.
 - Pages: Tabs with value { "$bindState": "/tab" } and sections with visible conditions, or Link to another app at "/apps/<name>".
 
+## SVGs
+
+Diagrams, illustrations, icons and logos are SVGs, saved on their own with create_svg (and list_svgs / get_svg / update_svg / delete_svg) and shown in any app by name:
+
+\`\`\`json
+{ "type": "Svg", "props": { "name": "runtime-diagram", "alt": "Agents call tools through Arcade" }, "children": [] }
+\`\`\`
+
+- The markup is one standalone \`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 W H">\` element. Give it a viewBox (not just width and height) so it scales to fit; it fills the width of its container, or set the Svg's height in px.
+- It is drawn like an image: scripts, event handlers, links and external images or fonts do nothing. Text uses system fonts, so set font-family="sans-serif".
+- Use theme colors so it matches the app: currentColor (the text color) and var(--foreground), var(--muted-foreground), var(--background), var(--muted), var(--line), var(--primary), var(--primary-foreground) and var(--chart-1) … var(--chart-5).
+- An updated SVG shows up in every app that uses it, so fix a diagram with update_svg rather than saving a copy.
+- Charts of data are a Chart, not an SVG.
+
 ## Slideshows
 
 A presentation is an app whose root is a Slides element with one Slide child per slide. Slides shows one at a time with previous/next buttons, arrow keys and a full-screen button, so the spec needs no navigation of its own.
 
 - Write text with Markdown: a few short bullets per slide, not paragraphs. Each Slide has a title and a layout ("title", "section", "content" or "two-column").
+- Show ideas with visuals: an Svg diagram beside the bullets in a "two-column" slide, or an illustration under the title of a "title" or "section" slide (give it a height there, e.g. 160).
 - Slides can show live data: wrap a Chart, Metric or DataTable in a Query, or put values in Markdown with $template, exactly as in any other app.
 - One slide per row of data: "repeat" on the Slides element with a single Slide child that reads { "$item": "field" }.
 - Slides never scroll, like slides in a presentation: the deck fits the window, and a slide whose content doesn't fit is shrunk until it does. No ScrollArea in a deck; split long content (a long list, a table with many rows) across slides, e.g. a few rows per slide.

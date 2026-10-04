@@ -106,6 +106,20 @@ names, queries and mutations, and the element tree) and return readable errors.
 The catalog lives in `packages/api/src/ui` and is shared with the frontend as
 `@template/api/ui`.
 
+## SVGs
+
+Diagrams, illustrations and icons are SVGs stored in their own table and
+shown in any app by name with the `Svg` component
+(`{ "type": "Svg", "props": { "name": "runtime-diagram" } }`), so one SVG can
+be reused across apps and updated in place. `/api/svgs` is CRUD for them, and
+the MCP server has `list_svgs`, `get_svg`, `create_svg`, `update_svg` and
+`delete_svg`. App validation rejects an `Svg` whose name doesn't exist.
+
+The frontend draws each SVG as an `<img>`, so its scripts, event handlers and
+external resources never run or load, and its ids and styles can't clash with
+the page. The theme's colors are passed in as CSS variables, so an SVG that
+uses `currentColor`, `var(--foreground)` or `var(--chart-1)` matches the app.
+
 ## CLI
 
 `packages/cli` is exposed at the repo root as `pnpm cli`:
@@ -122,6 +136,9 @@ pnpm cli api scripts list
 pnpm cli api scripts create --name inbox --file inbox.js
 pnpm cli api scripts get|update|delete <id>
 pnpm cli api scripts execute <id> --input '{"count": 5}'
+pnpm cli api svgs list
+pnpm cli api svgs create --name runtime-diagram --description "…" --file diagram.svg
+pnpm cli api svgs get|update|delete <id>
 ```
 
 `pnpm dev` is `pnpm cli dev`: it starts the portless HTTPS proxy, registers the

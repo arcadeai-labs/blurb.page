@@ -1,7 +1,7 @@
 import { getDb } from './db'
-import { type Doc, docs, scripts } from './db/schema'
+import { type Doc, docs, scripts, svgs } from './db/schema'
 import { docEmbeds, parseEmbed } from './ui/doc'
-import { referencedScripts, validateEmbed } from './ui/validate'
+import { referencedScripts, referencedSvgs, validateEmbed } from './ui/validate'
 
 export function toDocSummary(doc: Doc, baseUrl: string) {
   return {
@@ -29,13 +29,19 @@ export async function docErrors(body: string) {
     return []
   }
 
-  const rows = await getDb().select({ name: scripts.name }).from(scripts)
-  const scriptNames = new Set(rows.map((row) => row.name))
+  const [scriptRows, svgRows] = await Promise.all([
+    getDb().select({ name: scripts.name }).from(scripts),
+    getDb().select({ name: svgs.name }).from(svgs),
+  ])
+  const existing = {
+    scripts: new Set(scriptRows.map((row) => row.name)),
+    svgs: new Set(svgRows.map((row) => row.name)),
+  }
 
   return embeds.flatMap((source, index) => {
     const parsed = parseEmbed(source)
     const errors = parsed.ok
-      ? validateEmbed(parsed.spec, scriptNames)
+      ? validateEmbed(parsed.spec, existing)
       : parsed.errors
 
     return errors.map((error) => `ui block ${index + 1}: ${error}`)
@@ -54,6 +60,21 @@ export async function docsRunning(scriptName: string) {
         return (
           parsed.ok && referencedScripts({ spec: parsed.spec }).has(scriptName)
         )
+      }),
+    )
+    .map((doc) => doc.name)
+}
+
+/** Names of the docs with a component that shows the SVG called `svgName`. */
+export async function docsShowing(svgName: string) {
+  const rows = await getDb().select().from(docs)
+
+  return rows
+    .filter((doc) =>
+      docEmbeds(doc.body).some((source) => {
+        const parsed = parseEmbed(source)
+
+        return parsed.ok && referencedSvgs({ spec: parsed.spec }).has(svgName)
       }),
     )
     .map((doc) => doc.name)

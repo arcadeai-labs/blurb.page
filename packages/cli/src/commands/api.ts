@@ -7,6 +7,7 @@ import {
 } from '../lib/api-client.ts'
 import { openBrowser } from '../lib/browser.ts'
 import { registerScriptCommands } from './scripts.ts'
+import { registerSvgCommands } from './svgs.ts'
 
 type ApiOptions = {
   baseUrl?: string
@@ -89,4 +90,5 @@ export function registerApiCommands(program: Command) {
     })
 
   registerScriptCommands(api)
+  registerSvgCommands(api)
 }
