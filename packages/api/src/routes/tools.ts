@@ -1,7 +1,12 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 import type { AuthEnv } from '../auth/routes'
-import { McpUnavailableError, toFunctionName, withMcpClient } from '../mcp'
+import {
+  listAllTools,
+  McpUnavailableError,
+  toFunctionName,
+  withMcpClient,
+} from '../mcp'
 
 const toolSchema = z
   .object({
@@ -37,9 +42,9 @@ export const toolsRoutes = new OpenAPIHono<AuthEnv>().openapi(
   listToolsRoute,
   async (c) => {
     try {
-      const { tools } = await withMcpClient(
+      const tools = await withMcpClient(
         await c.var.mcpConnection(),
-        (client) => client.listTools(),
+        listAllTools,
       )
 
       return c.json(

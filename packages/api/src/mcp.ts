@@ -1,5 +1,6 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
+import type { Tool } from '@modelcontextprotocol/sdk/types.js'
 import { type HostFunctionGroup, RunHostFunctionError } from 'run'
 import { z } from 'zod'
 
@@ -50,6 +51,23 @@ export async function withMcpClient<T>(
   } finally {
     await client.close()
   }
+}
+
+/**
+ * Every tool on the server. `tools/list` is paginated (Arcade's gateways send
+ * 100 tools a page), so this follows `nextCursor` to the end.
+ */
+export async function listAllTools(client: Client) {
+  const tools: Tool[] = []
+  let cursor: string | undefined
+
+  do {
+    const page = await client.listTools(cursor ? { cursor } : undefined)
+    tools.push(...page.tools)
+    cursor = page.nextCursor
+  } while (cursor)
+
+  return tools
 }
 
 /** MCP tool names can contain characters that aren't valid JS identifiers. */
@@ -126,7 +144,7 @@ export async function mcpHostFunctions(
   client: Client,
   onAuthorizationRequired: (toolName: string, url: string) => void,
 ): Promise<HostFunctionGroup> {
-  const { tools } = await client.listTools()
+  const tools = await listAllTools(client)
   const functions: HostFunctionGroup = {}
 
   for (const tool of tools) {
