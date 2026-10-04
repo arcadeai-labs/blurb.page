@@ -17,7 +17,7 @@ import { authClient } from '@/lib/auth-client'
 // Asks the signed-in user whether an MCP client may act as them. The OAuth
 // provider sends users here with a signed query naming the client.
 export const Route = createFileRoute('/consent')({
-  head: () => ({ meta: [{ title: 'Allow access · every-ui' }] }),
+  head: () => ({ meta: [{ title: 'Allow access · blurb.page' }] }),
   component: Consent,
 })
 
@@ -72,7 +72,8 @@ function Consent() {
           ) : (
             <>
               <CardTitle>
-                Allow {client.data?.client_name ?? 'this app'} to use every-ui?
+                Allow {client.data?.client_name ?? 'this app'} to use
+                blurb.page?
               </CardTitle>
               <CardDescription>
                 It will build and run apps as {me.data?.email}, with your Arcade

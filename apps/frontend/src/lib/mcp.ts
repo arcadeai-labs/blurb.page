@@ -20,7 +20,7 @@ let connection: Promise<Client> | undefined
 /** One client per page; the server is stateless, so it never goes stale. */
 function getClient() {
   connection ??= (async () => {
-    const client = new Client({ name: 'every-ui-frontend', version: '0.0.0' })
+    const client = new Client({ name: 'blurb-page-frontend', version: '0.0.0' })
     await client.connect(
       new StreamableHTTPClientTransport(new URL(mcpPath, window.location.href)),
     )

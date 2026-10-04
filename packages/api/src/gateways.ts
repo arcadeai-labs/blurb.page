@@ -59,7 +59,7 @@ const gatewaySchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   slug: z.string(),
-  // `arcade` gateways sign users in with Arcade (the token every-ui holds);
+  // `arcade` gateways sign users in with Arcade (the token blurb.page holds);
   // `arcade_header` ones need a project API key, `user_source` another IdP.
   auth_type: z.string(),
 })

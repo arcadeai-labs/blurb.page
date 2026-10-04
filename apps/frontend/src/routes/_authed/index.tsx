@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
@@ -18,36 +17,17 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
-import { listApps, mcpPath } from '@/lib/mcp'
+import { listApps } from '@/lib/mcp'
 
 export const Route = createFileRoute('/_authed/')({
   component: Apps,
 })
 
-/** The MCP URL agents connect to; only known in the browser. */
-function useMcpUrl() {
-  const [url, setUrl] = useState(mcpPath)
-
-  useEffect(() => {
-    setUrl(new URL(mcpPath, window.location.href).toString())
-  }, [])
-
-  return url
-}
-
 function Apps() {
-  const mcpUrl = useMcpUrl()
   const appsQuery = useQuery({ queryKey: ['apps'], queryFn: listApps })
 
   return (
-    <Page
-      title="Apps"
-      description={
-        <>
-          Connect an agent to <code>{mcpUrl}</code> to create and change apps.
-        </>
-      }
-    >
+    <Page>
       {appsQuery.isPending ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           <Skeleton className="h-32" />
@@ -68,7 +48,7 @@ function Apps() {
           <EmptyHeader>
             <EmptyTitle>No apps yet</EmptyTitle>
             <EmptyDescription>
-              Point an agent at {mcpUrl} and ask it to build one.
+              Add the MCP URL to your agent and ask it to build one.
             </EmptyDescription>
           </EmptyHeader>
         </Empty>

@@ -38,7 +38,7 @@ function Authed() {
 
   if (me.isError) {
     return (
-      <Page title="every-ui">
+      <Page>
         <Alert variant="destructive">
           <AlertTitle>Could not check who is signed in</AlertTitle>
           <AlertDescription>{me.error.message}</AlertDescription>
