@@ -302,7 +302,7 @@ export function Slide({ props, children }: PropsOf<'Slide'>) {
               {props.title}
             </h2>
           ) : null}
-          <div className="text-muted-foreground">{children}</div>
+          <div className="grid gap-6 text-muted-foreground">{children}</div>
         </ShrinkToFit>
       </div>
     )

@@ -41,3 +41,14 @@ export const apps = pgTable('apps', {
 })
 
 export type App = typeof apps.$inferSelect
+
+/** SVG images, shown in apps by name with the Svg component. */
+export const svgs = pgTable('svgs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  description: text('description').notNull(),
+  markup: text('markup').notNull(),
+  ...timestamps,
+})
+
+export type Svg = typeof svgs.$inferSelect

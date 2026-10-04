@@ -4,6 +4,7 @@ import {
   appSchema,
   appSummarySchema,
   scriptErrorSchema,
+  svgSchema,
 } from '@template/api/ui'
 import { z } from 'zod'
 
@@ -89,6 +90,10 @@ export function listApps() {
 
 export function getApp(name: string) {
   return callTool('get_app', { name }, appSchema)
+}
+
+export function getSvg(name: string) {
+  return callTool('get_svg', { name }, svgSchema)
 }
 
 export async function executeScript(name: string, input: unknown) {

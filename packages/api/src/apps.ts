@@ -1,7 +1,7 @@
 import { getDb } from './db'
-import { type App, apps, scripts } from './db/schema'
+import { type App, apps, scripts, svgs } from './db/schema'
 import type { ActionBinding, AppSpec } from './ui/app'
-import { referencedScripts, validateApp } from './ui/validate'
+import { referencedScripts, referencedSvgs, validateApp } from './ui/validate'
 
 /**
  * Where apps are rendered. The frontend serves the API, so that's the origin
@@ -35,14 +35,20 @@ export function toAppJson(app: App, baseUrl: string) {
   }
 }
 
-/** Validates an app, including that every script it runs exists. */
+/** Validates an app, including that every script it runs and SVG it shows exists. */
 export async function appErrors(app: {
   spec: AppSpec
   onLoad?: ActionBinding[]
 }) {
-  const rows = await getDb().select({ name: scripts.name }).from(scripts)
+  const [scriptRows, svgRows] = await Promise.all([
+    getDb().select({ name: scripts.name }).from(scripts),
+    getDb().select({ name: svgs.name }).from(svgs),
+  ])
 
-  return validateApp(app, new Set(rows.map((row) => row.name)))
+  return validateApp(app, {
+    scripts: new Set(scriptRows.map((row) => row.name)),
+    svgs: new Set(svgRows.map((row) => row.name)),
+  })
 }
 
 /** Names of the apps that run the script called `scriptName`. */
@@ -51,5 +57,14 @@ export async function appsRunning(scriptName: string) {
 
   return rows
     .filter((app) => referencedScripts(app).has(scriptName))
+    .map((app) => app.name)
+}
+
+/** Names of the apps that show the SVG called `svgName`. */
+export async function appsShowing(svgName: string) {
+  const rows = await getDb().select().from(apps)
+
+  return rows
+    .filter((app) => referencedSvgs(app).has(svgName))
     .map((app) => app.name)
 }
