@@ -41,7 +41,11 @@ function AppPage() {
   return (
     <Page title={app.title} description={app.description}>
       {/* A changed app (e.g. updated by an agent) remounts with fresh state. */}
-      <AppRenderer key={`${app.id}:${app.updatedAt}`} app={app} />
+      <AppRenderer
+        key={`${app.id}:${app.updatedAt}`}
+        spec={app.spec}
+        onLoad={app.onLoad}
+      />
     </Page>
   )
 }

@@ -200,3 +200,22 @@ pnpm lint
 pnpm fmt
 pnpm start
 ```
+
+## Docs
+
+Docs are Notion-like pages at `/docs/<name>` that people edit in the browser
+(a Tiptap editor: type `/` for blocks) and agents write over MCP
+(`get_doc_guide`, `create_doc`, `update_doc`, …). A doc is stored as Markdown;
+a fenced code block with the language `ui` holds a json-render spec (the same
+format as an app's) and renders as a live component:
+
+````md
+Open issues by label:
+
+```ui
+{ "root": "chart", "elements": { … }, "queries": { … } }
+```
+````
+
+Saving validates every `ui` block like an app spec, including that the scripts
+it runs exist.

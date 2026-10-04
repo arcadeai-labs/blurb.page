@@ -109,6 +109,15 @@ export function Page({
             <Button
               variant="ghost"
               nativeButton={false}
+              render={
+                <Link to="/docs" activeProps={{ 'aria-current': 'page' }} />
+              }
+            >
+              Docs
+            </Button>
+            <Button
+              variant="ghost"
+              nativeButton={false}
               render={<a href="/api">API Docs</a>}
             />
             <UserMenu />

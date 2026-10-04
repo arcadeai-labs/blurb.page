@@ -2,3 +2,4 @@
 export * from '../script-error'
 export * from './app'
 export * from './catalog'
+export * from './doc'

@@ -3,6 +3,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import {
   appSchema,
   appSummarySchema,
+  docSchema,
+  docSummarySchema,
   scriptErrorSchema,
 } from '@template/api/ui'
 import { z } from 'zod'
@@ -98,4 +100,31 @@ export async function executeScript(name: string, input: unknown) {
     z.object({ value: z.unknown() }),
   )
   return value
+}
+
+export function listDocs() {
+  return callTool(
+    'list_docs',
+    {},
+    z.object({ docs: z.array(docSummarySchema) }),
+  )
+}
+
+export function getDoc(name: string) {
+  return callTool('get_doc', { name }, docSchema)
+}
+
+export function createDoc(doc: { name: string; title: string; body: string }) {
+  return callTool('create_doc', doc, docSchema)
+}
+
+export function updateDoc(
+  id: string,
+  values: { name?: string; title?: string; body?: string },
+) {
+  return callTool('update_doc', { id, ...values }, docSchema)
+}
+
+export function deleteDoc(id: string) {
+  return callTool('delete_doc', { id }, z.object({ id: z.string() }))
 }

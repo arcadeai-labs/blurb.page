@@ -139,6 +139,33 @@ export const customComponentDefinitions = {
       'Pretty-printed JSON of any value. Handy for showing a raw script result while building an app.',
     example: { value: { $state: '/result' } },
   },
+  Markdown: {
+    props: z.object({
+      text: z.string(),
+    }),
+    slots: [],
+    description:
+      // biome-ignore lint/suspicious/noTemplateCurlyInString: json-render $template syntax
+      'Rich text written in GitHub-flavored Markdown: headings, **bold**, _italic_, lists, task lists, links, quotes, code, tables and images. Use it for prose and bullet points (e.g. slide content); use Text for a single value. Put live values in with { "$template": "Revenue is ${/queries/stats/data/revenue}" }. Raw HTML is shown as text.',
+    example: { text: '- Revenue up **12%**\n- Churn down to 2%' },
+  },
+  Slides: {
+    props: z.object({}),
+    slots: ['default'],
+    description:
+      'A slideshow: shows one child at a time on a 16:9 canvas, with previous/next buttons, a slide counter, arrow-key navigation and a full-screen button for presenting. Each child is one slide, normally a Slide. Make it the root element of a presentation. Slides never scroll: the deck fits the window and the content of each slide is shrunk to fit it, so never put a ScrollArea in a deck. With "repeat" over an array and a single Slide child, it shows one slide per item.',
+    example: {},
+  },
+  Slide: {
+    props: z.object({
+      title: z.string().nullable(),
+      layout: z.enum(['title', 'section', 'content', 'two-column']).nullable(),
+    }),
+    slots: ['default'],
+    description:
+      'One slide of a Slides deck. layout: "title" (large centered title with children such as a subtitle below, for the opening slide), "section" (centered title introducing a part of the talk), "content" (the default: title at the top, children stacked below) or "two-column" (title at the top, children side by side, e.g. a Markdown beside a Chart). Use Markdown for text; Chart, Metric, DataTable and Query work as anywhere else. Keep each slide sparse (a few bullets or one chart): content that does not fit is shrunk until it does, so split long content across slides.',
+    example: { title: 'Q3 results', layout: 'content' },
+  },
 }
 
 /** Every component an app can use: the shadcn set plus the custom ones. */

@@ -220,6 +220,77 @@ export const exampleApp: {
   },
 }
 
+/** A slideshow spec; its chart reads the example app's issue-stats script. */
+export const exampleSlides: AppSpec = {
+  root: 'deck',
+  queries: { stats: { script: 'issue-stats' } },
+  elements: {
+    deck: {
+      type: 'Slides',
+      props: {},
+      children: ['intro', 'status', 'labels'],
+    },
+    intro: {
+      type: 'Slide',
+      props: { title: 'Web issues review', layout: 'title' },
+      children: ['intro-text'],
+    },
+    'intro-text': {
+      type: 'Markdown',
+      props: { text: 'Weekly triage · Platform team' },
+      children: [],
+    },
+    status: {
+      type: 'Slide',
+      props: { title: 'Where we are', layout: 'content' },
+      children: ['status-query'],
+    },
+    'status-query': {
+      type: 'Query',
+      props: { query: 'stats' },
+      children: ['status-text'],
+    },
+    'status-text': {
+      type: 'Markdown',
+      props: {
+        text: {
+          $template:
+            // biome-ignore lint/suspicious/noTemplateCurlyInString: json-render $template syntax
+            '- **${/queries/stats/data/open}** open issues\n- **${/queries/stats/data/closed}** closed this quarter',
+        },
+      },
+      children: [],
+    },
+    labels: {
+      type: 'Slide',
+      props: { title: 'By label', layout: 'two-column' },
+      children: ['labels-text', 'labels-query'],
+    },
+    'labels-text': {
+      type: 'Markdown',
+      props: {
+        text: '- Bugs are most of the backlog\n- Docs issues close fastest',
+      },
+      children: [],
+    },
+    'labels-query': {
+      type: 'Query',
+      props: { query: 'stats' },
+      children: ['labels-chart'],
+    },
+    'labels-chart': {
+      type: 'Chart',
+      props: {
+        type: 'bar',
+        data: { $state: '/queries/stats/data/byLabel' },
+        xKey: 'label',
+        series: [{ key: 'open', label: 'Open' }],
+      },
+      children: [],
+    },
+  },
+}
+
 /** Scripts the example app runs. */
 export const exampleScriptNames = new Set([
   'list-issues',
@@ -275,7 +346,7 @@ Build exactly what the user asked for, with the fewest elements that do it well.
 
 ## Fit the window
 
-An app should fit in the browser window like a desktop app: the page itself shouldn't scroll, its long parts should. Anything that grows with data (tables, lists, repeated items, message or document bodies, logs, JsonView) goes in a ScrollArea, which scrolls on its own instead of stretching the page.
+An app should fit in the browser window like a desktop app: the page itself shouldn't scroll, its long parts should. Anything that grows with data (tables, lists, repeated items, message or document bodies, logs, JsonView) goes in a ScrollArea, which scrolls on its own instead of stretching the page. Slideshows are the exception: slides never scroll (see Slideshows).
 
 - Wrap only the long part, inside its Card and Query: keep a Card's title, toolbar and buttons outside the ScrollArea so they stay put.
 - Side-by-side panes (list and detail, inbox and message): a Grid of panes, each with a ScrollArea without a height. Both fill the window down to the bottom and scroll independently.
@@ -380,6 +451,19 @@ Mutations:
 - Note: a top-level { "$item": "field" } action param resolves to the item's state path, not its value; nest it (e.g. "input": { "id": { "$item": "id" } }) to pass the value.
 - Pages: Tabs with value { "$bindState": "/tab" } and sections with visible conditions, or Link to another app at "/apps/<name>".
 
+## Slideshows
+
+A presentation is an app whose root is a Slides element with one Slide child per slide. Slides shows one at a time with previous/next buttons, arrow keys and a full-screen button, so the spec needs no navigation of its own.
+
+- Write text with Markdown: a few short bullets per slide, not paragraphs. Each Slide has a title and a layout ("title", "section", "content" or "two-column").
+- Slides can show live data: wrap a Chart, Metric or DataTable in a Query, or put values in Markdown with $template, exactly as in any other app.
+- One slide per row of data: "repeat" on the Slides element with a single Slide child that reads { "$item": "field" }.
+- Slides never scroll, like slides in a presentation: the deck fits the window, and a slide whose content doesn't fit is shrunk until it does. No ScrollArea in a deck; split long content (a long list, a table with many rows) across slides, e.g. a few rows per slide.
+
+\`\`\`json
+${JSON.stringify(exampleSlides, null, 2)}
+\`\`\`
+
 ## Complete example
 
 A create_app call for an issue tracker. It shows many features at once for reference; a real app should only have the parts the user asked for. It assumes scripts named list-issues (input { state }, returns [{ id, title, state, labelText }]), issue-stats (returns { open, closed, byLabel: [{ label, open, closed }] }), create-issue (input { title, body }) and close-issue (input { id }).
@@ -393,5 +477,89 @@ ${JSON.stringify(exampleApp, null, 2)}
 Expressions such as { "$state": "/path" } work in any prop and in action params. Paths are JSON Pointers ("/form/title", "/issues/0/id").
 
 ${catalogReference()}
+`
+}
+
+/** A complete, valid `create_doc` call; its component runs `issue-stats`. */
+export const exampleDoc = {
+  name: 'weekly-triage',
+  title: 'Weekly triage',
+  body: `## Where we are
+
+Open issues are trending down. Labels with the most open issues get a triage owner this week:
+
+\`\`\`ui
+${JSON.stringify(
+  {
+    root: 'stats',
+    queries: { stats: { script: 'issue-stats' } },
+    elements: {
+      stats: {
+        type: 'Query',
+        props: { query: 'stats' },
+        children: ['chart'],
+      },
+      chart: {
+        type: 'Chart',
+        props: {
+          type: 'bar',
+          data: { $state: '/queries/stats/data/byLabel' },
+          xKey: 'label',
+          series: [{ key: 'open', label: 'Open' }],
+        },
+        children: [],
+      },
+    },
+  } satisfies AppSpec,
+  null,
+  2,
+)}
+\`\`\`
+
+## Owners
+
+- [ ] **bug**: Sam
+- [ ] **docs**: Priya
+`,
+}
+
+/** How to write docs, returned by `get_doc_guide`. */
+export function docGuide(frontendUrl: string) {
+  return `# Writing docs
+
+A doc is a Markdown page, like a Notion page, served at ${frontendUrl}/docs/<name>. People read and edit docs in the browser with a rich-text editor, and you create and change them with create_doc and update_doc. Prose carries the narrative; live components (charts, tables, metrics, forms) are embedded where they belong in it.
+
+## Markdown
+
+The editor understands: headings (#, ##, ###), paragraphs, **bold**, *italic*, ~~strike~~, \`code\`, links, bullet and numbered lists, task lists (- [ ] / - [x]), quotes, fenced code blocks, tables and horizontal rules. Other syntax (HTML, images, footnotes) is not kept when a person edits the doc. The title is shown in the navbar, so don't repeat it as a heading.
+
+## Embedded components
+
+A fenced code block with the language \`ui\` is a live component. Its body is a json-render spec in JSON, the same format as an app's spec (call get_app_guide for the components, expressions, queries and mutations):
+
+\`\`\`\`md
+\`\`\`ui
+{ "root": "…", "elements": { … }, "queries": { … }, "mutations": { … }, "state": { … } }
+\`\`\`
+\`\`\`\`
+
+- Each block is self-contained: its own state, queries and mutations. Blocks that run the same script with the same input share one request.
+- Keep blocks small and focused (a chart, a table, a few Metrics, a short form) and put the explanation in Markdown around them, not in Text elements.
+- A ScrollArea needs a height: docs scroll, so nothing fills the window.
+- Every block is validated like an app spec, including that the scripts it runs exist. Invalid docs are rejected with errors that name the block ("ui block 2: …").
+
+## Workflow
+
+1. Create the scripts the components need (see get_app_guide) and test them with execute_script.
+2. create_doc with the Markdown body. The response has the doc URL.
+3. People may have edited the doc since you last read it, so call get_doc right before update_doc and change that body: update_doc replaces the body as a whole.
+
+## Example
+
+A create_doc call. It assumes a script named issue-stats returning { byLabel: [{ label, open }] }.
+
+\`\`\`\`json
+${JSON.stringify(exampleDoc, null, 2)}
+\`\`\`\`
 `
 }

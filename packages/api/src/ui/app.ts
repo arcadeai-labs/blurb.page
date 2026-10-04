@@ -5,13 +5,16 @@ import { z } from 'zod'
 const record = z.record(z.string(), z.unknown())
 
 /** Lowercase words joined by single hyphens, e.g. `issue-tracker`. */
-export const appName = z
+export const slug = z
   .string()
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
     error: 'Name must be a slug: lowercase letters, digits and single hyphens',
   })
   .max(64)
-  .describe('Slug-friendly name, used in the app URL, e.g. `issue-tracker`')
+
+export const appName = slug.describe(
+  'Slug-friendly name, used in the app URL, e.g. `issue-tracker`',
+)
 
 const nextAction = z.object({ action: z.string(), params: record.optional() })
 
