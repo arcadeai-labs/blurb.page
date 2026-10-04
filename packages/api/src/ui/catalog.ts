@@ -126,7 +126,7 @@ export const customComponentDefinitions = {
     }),
     slots: ['default'],
     description:
-      'Fixed-height box that scrolls its children, so long content (tables, lists, message bodies, logs) scrolls on its own instead of growing the page. Wrap just the long part, inside its Card and Query. height is in px; leave it out to fill the window down to the bottom of the page, which suits side-by-side panes. A ScrollArea that fills must be the last thing in its section: content below it is pushed out of view.',
+      'Fixed-height box that scrolls its children, so long content (tables, lists, message bodies, logs) scrolls on its own instead of growing the page. Wrap just the long part, inside its Card and Query. height is in px; leave it out to fill the space its section has left (at least 240px), which suits side-by-side panes: the Cards, Stacks and Grids around it stretch to fill the page, and content above and below it stays in view.',
     example: {},
   },
   JsonView: {
@@ -167,7 +167,7 @@ export const customComponentDefinitions = {
     props: z.object({}),
     slots: ['default'],
     description:
-      'A slideshow: shows one child at a time on a 16:9 canvas, with previous/next buttons, a slide counter, arrow-key navigation and a full-screen button for presenting. Each child is one slide, normally a Slide. Make it the root element of a presentation. Slides never scroll: the deck fits the window and the content of each slide is shrunk to fit it, so never put a ScrollArea in a deck. With "repeat" over an array and a single Slide child, it shows one slide per item.',
+      'A slideshow: shows one child at a time on a 16:9 canvas, with previous/next buttons, a slide counter, arrow-key navigation and a full-screen button for presenting. Each child is one slide, normally a Slide. Make it the root element of a presentation. Slides never scroll: the deck fills the space it is given and the content of each slide is shrunk to fit it, so never put a ScrollArea in a deck. With "repeat" over an array and a single Slide child, it shows one slide per item.',
     example: {},
   },
   Slide: {

@@ -287,7 +287,10 @@ function AppActions({
   return (
     <ActionProvider handlers={handlers} navigate={(to) => navigate({ to })}>
       <AppQueriesProvider value={queries}>
-        <Renderer spec={spec} registry={registry} />
+        {/* Grows to fill a flex column, so the app can fill what it's in. */}
+        <div data-fill-root className="flex min-w-0 flex-1 flex-col">
+          <Renderer spec={spec} registry={registry} />
+        </div>
       </AppQueriesProvider>
       <QueryRunners spec={spec} store={store} />
       <OnLoad bindings={onLoad} store={store} />

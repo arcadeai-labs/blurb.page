@@ -17,6 +17,7 @@ import { isUniqueViolation } from './db/errors'
 import { apps, docs, type Script, scripts, svgs } from './db/schema'
 import {
   docErrors,
+  docsMounting,
   docsRunning,
   docsShowing,
   toDocJson,
@@ -181,9 +182,9 @@ Before creating or changing an app, call get_app_guide once: it documents the sp
 
 Less is more: build only what the user asked for, with the fewest elements that do it. No headings, intro text or other filler (the navbar already shows the app's title and description), and no features nobody asked for.
 
-Fit the window: the page shouldn't scroll. Put anything that grows with data (tables, lists, message bodies) in a ScrollArea so it scrolls on its own; side-by-side panes each get a ScrollArea that fills the window.
+Fit the page: an app fills whatever it's shown in (its page, or a block in a doc) and shouldn't scroll as a whole. Put anything that grows with data (tables, lists, message bodies) in a ScrollArea so it scrolls on its own; side-by-side panes each get a ScrollArea that fills the space left in them.
 
-Docs are Notion-like Markdown pages at ${baseUrl}/docs/<name> that people also edit in the browser. They embed live components (the same json-render specs, in \`\`\`ui code blocks) between paragraphs. Call get_doc_guide before create_doc or update_doc.`
+Docs are Notion-like Markdown pages at ${baseUrl}/docs/<name> that people also edit in the browser. They embed live components (the same json-render specs, or saved apps mounted by name, in \`\`\`ui code blocks) between paragraphs. Call get_doc_guide before create_doc or update_doc.`
 }
 
 /**
@@ -479,7 +480,15 @@ function createMcpServer(baseUrl: string) {
           .where(eq(apps.id, id))
           .returning()
 
-        return app ? ok(toAppJson(app, baseUrl)) : appNotFound()
+        if (!app) {
+          return appNotFound()
+        }
+
+        return withAppsNote(
+          ok(toAppJson(app, baseUrl)),
+          existing.name === app.name ? [] : await docsMounting(existing.name),
+          `Renamed from "${existing.name}"; update these docs, which still mount the old name`,
+        )
       })
     },
   )
@@ -495,9 +504,17 @@ function createMcpServer(baseUrl: string) {
       const [app] = await getDb()
         .delete(apps)
         .where(eq(apps.id, args.id))
-        .returning({ id: apps.id })
+        .returning({ id: apps.id, name: apps.name })
 
-      return app ? ok({ id: app.id }) : appNotFound()
+      if (!app) {
+        return appNotFound()
+      }
+
+      return withAppsNote(
+        ok({ id: app.id }),
+        await docsMounting(app.name),
+        'These docs still mount the deleted app',
+      )
     },
   )
 
