@@ -11,6 +11,7 @@ import {
   Query,
   RowTable,
   RowTableRow,
+  ScrollArea,
 } from './components'
 
 // Actions aren't registered here: AppRenderer handles them, since they need
@@ -41,5 +42,6 @@ export const { registry } = defineRegistry(componentCatalog, {
     Query,
     RowTable,
     RowTableRow,
+    ScrollArea,
   },
 })

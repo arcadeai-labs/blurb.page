@@ -120,6 +120,15 @@ export const customComponentDefinitions = {
       'Boundary for a named query. Shows a skeleton while it first loads and an error with a retry button if it fails; renders its children once data is in. Elements that read /queries/<name>/data must be inside a Query for that name. Inside, read the result with { "$state": "/queries/<name>/data" } (repeat over it, or pass it to DataTable, Chart or Metric).',
     example: { query: 'issues' },
   },
+  ScrollArea: {
+    props: z.object({
+      height: z.number().nullable(),
+    }),
+    slots: ['default'],
+    description:
+      'Fixed-height box that scrolls its children, so long content (tables, lists, message bodies, logs) scrolls on its own instead of growing the page. Wrap just the long part, inside its Card and Query. height is in px; leave it out to fill the window down to the bottom of the page, which suits side-by-side panes. A ScrollArea that fills must be the last thing in its section: content below it is pushed out of view.',
+    example: {},
+  },
   JsonView: {
     props: z.object({
       value: z.unknown(),
