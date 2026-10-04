@@ -40,14 +40,18 @@ export function Page({
             aria-label="Primary navigation"
             className="flex shrink-0 items-center gap-1"
           >
-            <Button variant="ghost" asChild>
-              <Link to="/" activeProps={{ 'aria-current': 'page' }}>
-                Apps
-              </Link>
+            <Button
+              variant="ghost"
+              nativeButton={false}
+              render={<Link to="/" activeProps={{ 'aria-current': 'page' }} />}
+            >
+              Apps
             </Button>
-            <Button variant="ghost" asChild>
-              <a href="/api">API Docs</a>
-            </Button>
+            <Button
+              variant="ghost"
+              nativeButton={false}
+              render={<a href="/api">API Docs</a>}
+            />
           </nav>
         </div>
         <Separator />
