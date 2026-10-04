@@ -202,7 +202,7 @@ Open issues by label:
 ````
 
 A `ui` block can also mount a saved app by name, `{ "app": "issue-tracker" }`,
-which shows the app as it is now (type `/` and pick it under Apps). Saving
+which shows the app as it is now (type `/` and pick it under Components). Saving
 validates every `ui` block like an app spec, including that the scripts it runs
 exist, and that mounted apps exist.
 

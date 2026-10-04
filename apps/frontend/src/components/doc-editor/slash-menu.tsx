@@ -10,7 +10,13 @@ import Suggestion, {
   type SuggestionProps,
 } from '@tiptap/suggestion'
 import type { AppSummary } from '@template/api/ui'
-import { forwardRef, useImperativeHandle, useState } from 'react'
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from 'react'
 import {
   Command,
   CommandEmpty,
@@ -20,7 +26,8 @@ import {
 } from '@/components/ui/command'
 import { newEmbedSource } from './ui-block'
 
-const groups = ['Blocks', 'Apps'] as const
+// Components come first: Markdown shortcuts (#, -, [ ]) cover the blocks too.
+const groups = ['Components', 'Blocks'] as const
 
 type SlashItem = {
   id: string
@@ -116,26 +123,28 @@ const blockItems: SlashItem[] = [
     keywords: ['hr', 'separator', 'rule'],
     run: block((chain) => chain.setHorizontalRule()),
   },
-  {
-    id: 'Component',
-    title: 'Component',
-    group: 'Blocks',
-    keywords: ['ui', 'embed', 'chart', 'table', 'app', 'json'],
-    run: block((chain) =>
-      chain.insertContent({
-        type: 'uiBlock',
-        attrs: { source: newEmbedSource },
-      }),
-    ),
-  },
 ]
+
+/** Inserts a component to write as a json-render spec. */
+const newComponentItem: SlashItem = {
+  id: 'New component',
+  title: 'New component',
+  group: 'Components',
+  keywords: ['ui', 'embed', 'chart', 'table', 'json'],
+  run: block((chain) =>
+    chain.insertContent({
+      type: 'uiBlock',
+      attrs: { source: newEmbedSource },
+    }),
+  ),
+}
 
 /** Mounts a saved app, which stays up to date with it. */
 function appItem(app: AppSummary): SlashItem {
   return {
     id: `app:${app.name}`,
     title: app.title,
-    group: 'Apps',
+    group: 'Components',
     keywords: [app.name, 'app'],
     run: block((chain) =>
       chain.insertContent({
@@ -162,6 +171,18 @@ const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(
   function SlashMenu({ items: found, command }, ref) {
     const [selected, setSelected] = useState(0)
     const index = Math.min(selected, found.length - 1)
+    const list = useRef<HTMLDivElement>(null)
+
+    const selectedId = found[index]?.id
+
+    // The editor keeps focus, so arrow keys don't scroll the list themselves.
+    useEffect(() => {
+      if (selectedId === undefined) return
+
+      list.current
+        ?.querySelector(`[cmdk-item][data-value="${CSS.escape(selectedId)}"]`)
+        ?.scrollIntoView({ block: 'nearest' })
+    }, [selectedId])
 
     useImperativeHandle(ref, () => ({
       onKeyDown: ({ event }) => {
@@ -185,13 +206,13 @@ const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(
     return (
       <Command
         shouldFilter={false}
-        value={found[index]?.id ?? ''}
+        value={selectedId ?? ''}
         onValueChange={(id) =>
           setSelected(found.findIndex((item) => item.id === id))
         }
         className="w-56 border shadow-md"
       >
-        <CommandList>
+        <CommandList ref={list}>
           <CommandEmpty>No results</CommandEmpty>
           {groups.map((group) => {
             const inGroup = found.filter((item) => item.group === group)
@@ -217,8 +238,8 @@ const SlashMenu = forwardRef<SlashMenuHandle, SlashMenuProps>(
 )
 
 /**
- * Type `/` to turn a block into a heading, list, table, component…, or to
- * mount one of the saved apps listed by `apps`.
+ * Type `/` to add a component (a new one, or one of the saved apps listed by
+ * `apps`, mounted), or to turn a block into a heading, list, table…
  */
 export const SlashCommands = Extension.create<{
   apps: () => Promise<AppSummary[]>
@@ -240,9 +261,11 @@ export const SlashCommands = Extension.create<{
           // Without the apps (e.g. offline), the blocks still work.
           const saved = await apps().catch(() => [])
 
-          return [...blockItems, ...saved.map(appItem)].filter((item) =>
-            matches(item, query),
-          )
+          return [
+            newComponentItem,
+            ...saved.map(appItem),
+            ...blockItems,
+          ].filter((item) => matches(item, query))
         },
         command: ({ editor, range, props }) => props.run(editor, range),
         render: () => {
