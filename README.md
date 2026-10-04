@@ -112,7 +112,7 @@ linked to one user:
   `http://127.0.0.1:5173/api/arcade/identity-callback` for the dev server.
   Without it, everyone uses the default gateway.
 
-Users pick a gateway at `/gateway`: any gateway in their projects that signs
+Users pick a gateway from the navbar: any gateway in their projects that signs
 users in with Arcade (gateways that take an API key can't run tools as them).
 Their choice is kept in `user_gateways`; until they pick one, tool calls go to
 `MCP_URL`, or else Arcade's global gateway (`$ARCADE_API_URL/mcp/arcade`),

@@ -188,6 +188,7 @@ function instructions(baseUrl: string) {
   return `Build web apps (UIs, forms, tables, charts, dashboards, slideshows) backed by integration tools.
 
 - Scripts are server-side JavaScript that call the upstream integration tools (list_script_tools) as \`await tools.<functionName>(args)\`, take a validated \`input\` and return JSON.
+- Apps can't generate content: no model runs inside them, so they only show and act on what the tools return and what the user enters. Write any fixed copy (slide text, labels) into the app yourself, and don't build features that auto-draft or summarize (drafted replies, summaries).
 - Apps are json-render UI specs rendered with shadcn/ui at ${baseUrl}/apps/<name>. Their buttons, forms and load hooks run scripts by name (the runScript action) and render the results.
 - SVGs are saved images (diagrams, illustrations, icons) that apps show by name with the Svg component. Create them with create_svg.
 
