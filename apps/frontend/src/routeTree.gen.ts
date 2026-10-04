@@ -13,6 +13,8 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as McpRouteImport } from './routes/mcp'
 import { Route as ApiSplatRouteImport } from './routes/api/$'
 import { Route as AppsNameRouteImport } from './routes/apps.$name'
+import { Route as DocsIndexRouteImport } from './routes/docs.index'
+import { Route as DocsNameRouteImport } from './routes/docs.$name'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -34,18 +36,32 @@ const AppsNameRoute = AppsNameRouteImport.update({
   path: '/apps/$name',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DocsIndexRoute = DocsIndexRouteImport.update({
+  id: '/docs/',
+  path: '/docs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DocsNameRoute = DocsNameRouteImport.update({
+  id: '/docs/$name',
+  path: '/docs/$name',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/mcp': typeof McpRoute
   '/api/$': typeof ApiSplatRoute
   '/apps/$name': typeof AppsNameRoute
+  '/docs/$name': typeof DocsNameRoute
+  '/docs/': typeof DocsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/mcp': typeof McpRoute
   '/api/$': typeof ApiSplatRoute
   '/apps/$name': typeof AppsNameRoute
+  '/docs/$name': typeof DocsNameRoute
+  '/docs': typeof DocsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -53,13 +69,22 @@ export interface FileRoutesById {
   '/mcp': typeof McpRoute
   '/api/$': typeof ApiSplatRoute
   '/apps/$name': typeof AppsNameRoute
+  '/docs/$name': typeof DocsNameRoute
+  '/docs/': typeof DocsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/mcp' | '/api/$' | '/apps/$name'
+  fullPaths: '/' | '/mcp' | '/api/$' | '/apps/$name' | '/docs/$name' | '/docs/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/mcp' | '/api/$' | '/apps/$name'
-  id: '__root__' | '/' | '/mcp' | '/api/$' | '/apps/$name'
+  to: '/' | '/mcp' | '/api/$' | '/apps/$name' | '/docs/$name' | '/docs'
+  id:
+    | '__root__'
+    | '/'
+    | '/mcp'
+    | '/api/$'
+    | '/apps/$name'
+    | '/docs/$name'
+    | '/docs/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -67,6 +92,8 @@ export interface RootRouteChildren {
   McpRoute: typeof McpRoute
   ApiSplatRoute: typeof ApiSplatRoute
   AppsNameRoute: typeof AppsNameRoute
+  DocsNameRoute: typeof DocsNameRoute
+  DocsIndexRoute: typeof DocsIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -99,6 +126,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppsNameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/docs/': {
+      id: '/docs/'
+      path: '/docs'
+      fullPath: '/docs/'
+      preLoaderRoute: typeof DocsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/docs/$name': {
+      id: '/docs/$name'
+      path: '/docs/$name'
+      fullPath: '/docs/$name'
+      preLoaderRoute: typeof DocsNameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -107,6 +148,8 @@ const rootRouteChildren: RootRouteChildren = {
   McpRoute: McpRoute,
   ApiSplatRoute: ApiSplatRoute,
   AppsNameRoute: AppsNameRoute,
+  DocsNameRoute: DocsNameRoute,
+  DocsIndexRoute: DocsIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -12,7 +12,6 @@ import {
 } from '@json-render/react'
 import {
   type ActionBinding,
-  type App,
   type AppSpec,
   type MutationState,
   mutateParams,
@@ -249,7 +248,15 @@ function ConfirmAction() {
   )
 }
 
-function AppActions({ app, store }: { app: App; store: StateStore }) {
+function AppActions({
+  spec,
+  onLoad,
+  store,
+}: {
+  spec: AppSpec
+  onLoad: ActionBinding[]
+  store: StateStore
+}) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const validation = useOptionalValidation()
@@ -260,7 +267,7 @@ function AppActions({ app, store }: { app: App; store: StateStore }) {
   // latest validation context through a ref.
   const [handlers] = useState(() =>
     createHandlers({
-      spec: app.spec,
+      spec,
       store,
       queryClient,
       getValidation: () => validationRef.current,
@@ -270,7 +277,7 @@ function AppActions({ app, store }: { app: App; store: StateStore }) {
   const queries = useMemo(
     () => ({
       refetch: (name: string) => {
-        const script = app.spec.queries?.[name]?.script
+        const script = spec.queries?.[name]?.script
 
         if (script) {
           void queryClient.refetchQueries({
@@ -280,30 +287,36 @@ function AppActions({ app, store }: { app: App; store: StateStore }) {
         }
       },
     }),
-    [app.spec, queryClient],
+    [spec, queryClient],
   )
 
   return (
     <ActionProvider handlers={handlers} navigate={(to) => navigate({ to })}>
       <AppQueriesProvider value={queries}>
-        <Renderer spec={app.spec} registry={registry} />
+        <Renderer spec={spec} registry={registry} />
       </AppQueriesProvider>
-      <QueryRunners spec={app.spec} store={store} />
-      <OnLoad bindings={app.onLoad} store={store} />
+      <QueryRunners spec={spec} store={store} />
+      <OnLoad bindings={onLoad} store={store} />
       <ConfirmAction />
     </ActionProvider>
   )
 }
 
 /**
- * Renders an app's json-render spec. Its queries and actions run scripts over
- * MCP, and query and mutation results are kept in state under `/queries` and
- * `/mutations`.
+ * Renders a json-render spec: an app's, or a component embedded in a doc. Its
+ * queries and actions run scripts over MCP, and query and mutation results are
+ * kept in state under `/queries` and `/mutations`.
  */
-export function AppRenderer({ app }: { app: App }) {
+export function AppRenderer({
+  spec,
+  onLoad = [],
+}: {
+  spec: AppSpec
+  onLoad?: ActionBinding[]
+}) {
   const queryClient = useQueryClient()
   const [store] = useState(() =>
-    createStateStore(initialAppState(app.spec, queryClient)),
+    createStateStore(initialAppState(spec, queryClient)),
   )
 
   // json-render doesn't catch failed event handlers, so a stopped action list
@@ -323,7 +336,7 @@ export function AppRenderer({ app }: { app: App }) {
     <StateProvider store={store}>
       <VisibilityProvider>
         <ValidationProvider>
-          <AppActions app={app} store={store} />
+          <AppActions spec={spec} onLoad={onLoad} store={store} />
         </ValidationProvider>
       </VisibilityProvider>
     </StateProvider>

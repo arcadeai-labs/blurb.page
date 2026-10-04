@@ -30,6 +30,7 @@
     "@modelcontextprotocol/sdk": "^1.32.0",
     "drizzle-orm": "^0.45.3",
     "hono": "^4.12.23",
+    "marked": "^17.0.6",
     "postgres": "^3.4.9",
     "run": "^2.1.7",
     "zod": "^4.4.3"

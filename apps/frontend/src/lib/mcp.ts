@@ -1,6 +1,11 @@
 import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
-import { appSchema, appSummarySchema } from '@template/api/ui'
+import {
+  appSchema,
+  appSummarySchema,
+  docSchema,
+  docSummarySchema,
+} from '@template/api/ui'
 import { z } from 'zod'
 
 // The frontend talks to the API's MCP server, the same interface agents use
@@ -69,4 +74,31 @@ export async function executeScript(name: string, input: unknown) {
     z.object({ value: z.unknown() }),
   )
   return value
+}
+
+export function listDocs() {
+  return callTool(
+    'list_docs',
+    {},
+    z.object({ docs: z.array(docSummarySchema) }),
+  )
+}
+
+export function getDoc(name: string) {
+  return callTool('get_doc', { name }, docSchema)
+}
+
+export function createDoc(doc: { name: string; title: string; body: string }) {
+  return callTool('create_doc', doc, docSchema)
+}
+
+export function updateDoc(
+  id: string,
+  values: { name?: string; title?: string; body?: string },
+) {
+  return callTool('update_doc', { id, ...values }, docSchema)
+}
+
+export function deleteDoc(id: string) {
+  return callTool('delete_doc', { id }, z.object({ id: z.string() }))
 }
