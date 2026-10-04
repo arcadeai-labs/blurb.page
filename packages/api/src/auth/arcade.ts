@@ -179,7 +179,7 @@ export function redirectUri(origin: string, provider: ArcadeProvider) {
 export function clientMetadata(origin: string) {
   return {
     client_id: `${origin}${clientMetadataPath}`,
-    client_name: 'every-ui',
+    client_name: 'blurb.page',
     client_uri: origin,
     redirect_uris: [redirectUri(origin, 'arcade')],
     grant_types: ['authorization_code', 'refresh_token'],
@@ -218,7 +218,7 @@ async function registerClient(origin: string) {
 }
 
 /**
- * The client ID every-ui signs in with on `origin`. Public origins use a
+ * The client ID blurb.page signs in with on `origin`. Public origins use a
  * Client ID Metadata Document: the ID is the URL of {@link clientMetadata},
  * which Arcade fetches, so nothing is registered. Arcade can't reach a dev
  * server, so local origins register a client instead, kept in the database

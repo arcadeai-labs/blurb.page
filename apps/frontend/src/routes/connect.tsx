@@ -19,7 +19,7 @@ import { connectArcadeAccount } from '@/lib/auth-client'
 // sign-in, which lists their gateways) and moves on to `next`. It's the same
 // Arcade login, so this usually passes straight through.
 export const Route = createFileRoute('/connect')({
-  head: () => ({ meta: [{ title: 'Connecting · every-ui' }] }),
+  head: () => ({ meta: [{ title: 'Connecting · blurb.page' }] }),
   component: Connect,
 })
 

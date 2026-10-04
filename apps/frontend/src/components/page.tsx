@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from '@tanstack/react-router'
 import { cn } from 'cn'
 import type { ReactNode } from 'react'
+import { Blurb } from '@/components/blurb'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Separator } from '@/components/ui/separator'
-import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/components/ui/toast'
 import { meQuery } from '@/lib/api'
 import { authClient } from '@/lib/auth-client'
@@ -68,9 +68,9 @@ function UserMenu() {
 }
 
 /**
- * A page under the navbar, which shows its title and description. Without a
- * title (e.g. while it loads) the navbar shows a skeleton instead. A `fill`
- * page stretches its content to the bottom of the page, for apps.
+ * A page under the navbar, headed by its title and description (none while it
+ * loads). A `fill` page stretches its content to the bottom of the page, for
+ * apps.
  */
 export function Page({
   title,
@@ -87,21 +87,13 @@ export function Page({
     <>
       <header className="sticky top-0 z-10 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3 sm:px-6">
-          {title === undefined ? (
-            <div className="grid gap-1.5">
-              <Skeleton className="h-4 w-40" />
-              <Skeleton className="h-3 w-64" />
-            </div>
-          ) : (
-            <div className="grid min-w-0 gap-0.5">
-              <h1 className="truncate text-sm font-medium">{title}</h1>
-              {description ? (
-                <p className="truncate text-xs text-muted-foreground">
-                  {description}
-                </p>
-              ) : null}
-            </div>
-          )}
+          <Link
+            to="/"
+            className="flex shrink-0 items-center gap-2 text-sm font-medium"
+          >
+            <Blurb className="size-5" />
+            blurb.page
+          </Link>
           <nav
             aria-label="Primary navigation"
             className="flex shrink-0 items-center gap-1"
@@ -122,11 +114,6 @@ export function Page({
             >
               Docs
             </Button>
-            <Button
-              variant="ghost"
-              nativeButton={false}
-              render={<a href="/api">API Docs</a>}
-            />
             <UserMenu />
           </nav>
         </div>
@@ -138,6 +125,14 @@ export function Page({
           fill ? 'flex flex-1 flex-col' : 'grid',
         )}
       >
+        {title === undefined ? null : (
+          <div className="grid gap-1">
+            <h1 className="text-xl font-medium">{title}</h1>
+            {description ? (
+              <p className="text-sm text-muted-foreground">{description}</p>
+            ) : null}
+          </div>
+        )}
         {children}
       </main>
     </>

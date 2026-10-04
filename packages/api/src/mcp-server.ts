@@ -209,7 +209,7 @@ function createMcpServer(
   connection: () => Promise<McpConnection>,
 ) {
   const server = new McpServer(
-    { name: 'every-ui', version: '0.0.0' },
+    { name: 'blurb-page', version: '0.0.0' },
     { instructions: instructions(baseUrl) },
   )
 

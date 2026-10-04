@@ -93,7 +93,7 @@ and `.env`.
 
 Anyone with an Arcade account signs in with it, the way MCP clients sign in to
 Arcade's gateways, and their tool calls run as them, on an MCP gateway they
-pick. every-ui signs users in with two of Arcade's authorization servers,
+pick. blurb.page signs users in with two of Arcade's authorization servers,
 linked to one user:
 
 - **`arcade`**, the OAuth server MCP clients use (`$ARCADE_CLOUD_URL/oauth2`).
@@ -119,7 +119,7 @@ Their choice is kept in `user_gateways`; until they pick one, tool calls go to
 which runs tools in their default project.
 
 Arcade's URLs default to production. `ARCADE_CLOUD_URL`, `ARCADE_API_URL` and
-`ARCADE_IDENTITY_URL` point every-ui at another stack, for example staging
+`ARCADE_IDENTITY_URL` point blurb.page at another stack, for example staging
 (`https://cloud.bosslevel.dev`, `https://api.bosslevel.dev` and
 `https://auth.bosslevel.dev`); set all three together, since accounts don't
 carry over between stacks.
@@ -130,12 +130,12 @@ and refreshes the tokens when they expire. Everything under `/api`, except auth
 itself, needs a signed-in user, and so does `/mcp`:
 
 - The frontend calls `/mcp` with its session cookie.
-- Other MCP clients (agents) use OAuth: every-ui is also an authorization
+- Other MCP clients (agents) use OAuth: blurb.page is also an authorization
   server for its own `/mcp` (Better Auth's MCP plugin), so a client registers
   itself, sends the user to `/login` and `/consent`, and then acts as them.
 
-Arcade's MCP OAuth server identifies every-ui by a client ID per origin. On a
-public origin it's the URL of a client metadata document every-ui serves
+Arcade's MCP OAuth server identifies blurb.page by a client ID per origin. On a
+public origin it's the URL of a client metadata document blurb.page serves
 (`/api/arcade/client.json`), which Arcade fetches. Arcade can't fetch a local
 one, so the dev server registers a client instead and keeps it in the
 `arcade_clients` table. Arcade only redirects over http to bare loopback hosts,
@@ -201,7 +201,7 @@ pnpm cli api svgs get|update|delete <id>
 `pnpm dev` is `pnpm cli dev`: it starts the portless HTTPS proxy, registers the
 branch's alias for the app, runs its `dev` script behind it, waits for the URL to
 answer and opens it in a browser, then removes the alias on exit. It also points
-the `every-ui` entry in the repo's `.mcp.json` at the MCP endpoint
+the `blurb-page` entry in the repo's `.mcp.json` at the MCP endpoint
 (`http://127.0.0.1:5173/mcp`), so MCP clients opened in the checkout, like
 Claude Code, use it. Other entries are kept, and it uses the loopback URL
 because Node-based clients don't trust the portless CA. Running the `dev` script

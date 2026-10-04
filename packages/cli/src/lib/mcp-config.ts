@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /** Key of the API's MCP server in `.mcp.json`. */
-const MCP_SERVER_NAME = 'every-ui'
+const MCP_SERVER_NAME = 'blurb-page'
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)

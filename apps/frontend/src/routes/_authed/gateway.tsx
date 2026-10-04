@@ -34,7 +34,7 @@ import { connectArcadeAccount } from '@/lib/auth-client'
 // Where the user's tool calls go: one of the MCP gateways in their Arcade
 // projects, or the default gateway.
 export const Route = createFileRoute('/_authed/gateway')({
-  head: () => ({ meta: [{ title: 'Gateway · every-ui' }] }),
+  head: () => ({ meta: [{ title: 'Gateway · blurb.page' }] }),
   component: GatewayPage,
 })
 

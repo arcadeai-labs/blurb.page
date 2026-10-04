@@ -18,7 +18,7 @@ import { authClient } from '@/lib/auth-client'
 // Signs users in with Arcade. The OAuth provider also sends MCP clients'
 // authorization here, with a signed query, when nobody is signed in.
 export const Route = createFileRoute('/login')({
-  head: () => ({ meta: [{ title: 'Sign in · every-ui' }] }),
+  head: () => ({ meta: [{ title: 'Sign in · blurb.page' }] }),
   component: Login,
 })
 
@@ -77,7 +77,7 @@ function Login() {
     <main className="flex min-h-svh items-center justify-center p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Sign in to every-ui</CardTitle>
+          <CardTitle>Sign in to blurb.page</CardTitle>
           <CardDescription>
             Use your Arcade account. Your apps run tools with your own
             connections.
