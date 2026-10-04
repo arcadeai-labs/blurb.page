@@ -60,8 +60,10 @@ function startApp(app: AppName, options: DevOptions, repoRoot: string) {
   // (for example Vite's HMR socket) have to be pointed at that hostname,
   // not the port.
   env.PORTLESS_HOST = `${routeName}.localhost`
-  // The frontend proxies `/api` to the Node API server.
+  // The frontend proxies `/api` and `/mcp` to the Node API server.
   env.API_ORIGIN = `http://${options.host}:${APP_PORTS.server}`
+  // The MCP server links to apps on the frontend.
+  env.FRONTEND_URL = getPortlessRoute('frontend', repoRoot).url
 
   const child = spawn('pnpm', ['--filter', `@template/${app}`, 'run', 'dev'], {
     cwd: repoRoot,

@@ -174,12 +174,19 @@ export function registerScriptCommands(api: Command) {
     scripts
       .command('execute')
       .argument('<id>')
+      .option('--input <json>', 'script input as JSON', '{}')
       .description('POST /api/scripts/:id/execute — run it in the sandbox'),
-  ).action(async (id: string, options: BaseOptions) => {
+  ).action(async (id: string, options: BaseOptions & { input: string }) => {
+    const input: unknown = JSON.parse(options.input)
     const result = await withApi(
       resolveBaseUrl(options.baseUrl),
       async (client) =>
-        readJson(await client.scripts[':id'].execute.$post({ param: { id } })),
+        readJson(
+          await client.scripts[':id'].execute.$post({
+            param: { id },
+            json: { input },
+          }),
+        ),
     )
 
     if (options.json) {

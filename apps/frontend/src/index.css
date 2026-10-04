@@ -3,6 +3,9 @@
 @import "shadcn/tailwind.css";
 @import "@fontsource-variable/geist";
 
+/* Classes used by @json-render/shadcn, which renders app specs. */
+@source "../node_modules/@json-render/shadcn/dist";
+
 @custom-variant dark (&:is(.dark *));
 
 @theme inline {

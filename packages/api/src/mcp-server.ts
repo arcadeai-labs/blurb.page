@@ -4,11 +4,21 @@ import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js'
 import { desc, eq } from 'drizzle-orm'
 import { z } from 'zod'
 
+import {
+  appErrors,
+  appsRunning,
+  frontendUrl,
+  toAppJson,
+  toAppSummary,
+} from './apps'
 import { getDb } from './db'
-import { type Script, scripts } from './db/schema'
+import { isUniqueViolation } from './db/errors'
+import { apps, type Script, scripts } from './db/schema'
 import { executeScript } from './execute'
 import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
-import { scriptFields } from './script-fields'
+import { scriptFields, scriptName } from './script-fields'
+import { appFields, appName } from './ui/app'
+import { appGuide } from './ui/guide'
 
 function toJson(script: Script) {
   return {
@@ -30,7 +40,15 @@ function fail(message: string): CallToolResult {
   return { content: [{ type: 'text', text: message }], isError: true }
 }
 
-const notFound = () => fail('Script not found')
+const scriptNotFound = () => fail('Script not found')
+
+const appNotFound = () => fail('App not found')
+
+function invalidApp(errors: string[]) {
+  return fail(
+    `The app is invalid. Fix these and retry (see get_app_guide):\n- ${errors.join('\n- ')}`,
+  )
+}
 
 /** Reports an unreachable upstream MCP server as a tool error. */
 async function upstream(fn: () => Promise<CallToolResult>) {
@@ -44,11 +62,72 @@ async function upstream(fn: () => Promise<CallToolResult>) {
   }
 }
 
-const id = z.uuid().describe('Script ID')
+/** Reports a taken name as a tool error. */
+async function uniqueName(kind: string, fn: () => Promise<CallToolResult>) {
+  try {
+    return await fn()
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return fail(`A ${kind} with that name already exists`)
+    }
+    throw error
+  }
+}
+
+/** Adds a note listing the apps that run a script, when there are any. */
+async function withAppsNote(
+  result: CallToolResult,
+  scriptName: string,
+  note: string,
+) {
+  const names = await appsRunning(scriptName)
+
+  if (names.length === 0) {
+    return result
+  }
+
+  return {
+    ...result,
+    content: [
+      ...result.content,
+      { type: 'text' as const, text: `${note}: ${names.join(', ')}` },
+    ],
+  }
+}
+
+const scriptId = z.uuid().describe('Script ID')
+
+const appId = z.uuid().describe('App ID')
+
+/** Looks a row up by `id` or `name`, whichever was given. */
+function idOrName<T extends typeof scripts | typeof apps>(
+  table: T,
+  args: { id?: string; name?: string },
+) {
+  if (args.id) {
+    return eq(table.id, args.id)
+  }
+  if (args.name) {
+    return eq(table.name, args.name)
+  }
+  return undefined
+}
+
+function instructions() {
+  return `Build web apps (UIs, forms, tables, charts, dashboards) backed by integration tools.
+
+- Scripts are server-side JavaScript that call the upstream integration tools (list_script_tools) as \`await tools.<functionName>(args)\`, take a validated \`input\` and return JSON.
+- Apps are json-render UI specs rendered with shadcn/ui at ${frontendUrl()}/apps/<name>. Their buttons, forms and load hooks run scripts by name (the runScript action) and render the results.
+
+Before creating or changing an app, call get_app_guide once: it documents the spec format, every component and action, and patterns for loading data, forms, tables, charts and row actions. Typical flow: list_script_tools → create_script (one per data operation; test with execute_script) → create_app → share the returned url. Use the list_/get_/update_/delete_ tools to change existing scripts and apps.`
+}
 
 /** The API's operations, exposed as MCP tools. */
 function createMcpServer() {
-  const server = new McpServer({ name: 'template-api', version: '0.0.0' })
+  const server = new McpServer(
+    { name: 'every-ui', version: '0.0.0' },
+    { instructions: instructions() },
+  )
 
   server.registerTool(
     'get_stats',
@@ -62,6 +141,16 @@ function createMcpServer() {
         uptimeMode: 'long-lived Node process',
         features: ['Hono API', 'Drizzle', 'Run SDK', 'MCP tools'],
       }),
+  )
+
+  server.registerTool(
+    'get_app_guide',
+    {
+      description:
+        'How to build apps: the workflow, how scripts and apps fit together, the json-render spec format, every component and action with their props, expressions, and a complete example. Read it before create_app or update_app.',
+      annotations: { readOnlyHint: true },
+    },
+    () => ({ content: [{ type: 'text', text: appGuide(frontendUrl()) }] }),
   )
 
   server.registerTool(
@@ -102,65 +191,94 @@ function createMcpServer() {
   server.registerTool(
     'get_script',
     {
-      description: 'Get a script',
-      inputSchema: { id },
+      description: 'Get a script by id or name',
+      inputSchema: { id: scriptId.optional(), name: scriptName.optional() },
       annotations: { readOnlyHint: true },
     },
     async (args) => {
-      const [script] = await getDb()
-        .select()
-        .from(scripts)
-        .where(eq(scripts.id, args.id))
+      const where = idOrName(scripts, args)
 
-      return script ? ok(toJson(script)) : notFound()
+      if (!where) {
+        return fail('Pass an id or a name')
+      }
+
+      const [script] = await getDb().select().from(scripts).where(where)
+
+      return script ? ok(toJson(script)) : scriptNotFound()
     },
   )
 
   server.registerTool(
     'create_script',
     {
-      description: 'Create a script',
+      description:
+        'Create a script: the body of an async JavaScript function with `input` and `tools.*` in scope, returning JSON. Apps run it by its (unique) name.',
       inputSchema: scriptFields,
     },
-    async (args) => {
-      const [script] = await getDb().insert(scripts).values(args).returning()
+    (args) =>
+      uniqueName('script', async () => {
+        const [script] = await getDb().insert(scripts).values(args).returning()
 
-      return ok(toJson(script))
-    },
+        return ok(toJson(script))
+      }),
   )
 
   server.registerTool(
     'update_script',
     {
-      description: 'Update a script',
-      inputSchema: { id, ...z.object(scriptFields).partial().shape },
+      description:
+        'Update a script. Fields left out are kept. Renaming breaks apps that run it by the old name.',
+      inputSchema: { id: scriptId, ...z.object(scriptFields).partial().shape },
       annotations: { idempotentHint: true },
     },
-    async ({ id, ...values }) => {
-      const [script] = await getDb()
-        .update(scripts)
-        .set(values)
-        .where(eq(scripts.id, id))
-        .returning()
+    ({ id, ...values }) =>
+      uniqueName('script', async () => {
+        const [previous] = await getDb()
+          .select({ name: scripts.name })
+          .from(scripts)
+          .where(eq(scripts.id, id))
+        const [script] = await getDb()
+          .update(scripts)
+          .set(values)
+          .where(eq(scripts.id, id))
+          .returning()
 
-      return script ? ok(toJson(script)) : notFound()
-    },
+        if (!script || !previous) {
+          return scriptNotFound()
+        }
+
+        return previous.name === script.name
+          ? ok(toJson(script))
+          : withAppsNote(
+              ok(toJson(script)),
+              previous.name,
+              `Renamed from "${previous.name}"; update these apps, which still run the old name`,
+            )
+      }),
   )
 
   server.registerTool(
     'delete_script',
     {
       description: 'Delete a script',
-      inputSchema: { id },
+      inputSchema: { id: scriptId },
       annotations: { destructiveHint: true, idempotentHint: true },
     },
     async (args) => {
       const [script] = await getDb()
         .delete(scripts)
         .where(eq(scripts.id, args.id))
-        .returning({ id: scripts.id })
+        .returning({ id: scripts.id, name: scripts.name })
 
-      return script ? ok({ id: script.id }) : notFound()
+      if (!script) {
+        return scriptNotFound()
+      }
+
+      return withAppsNote(
+        ok({ id: script.id }),
+        script.name,
+        'These apps still run the deleted script',
+      )
     },
   )
 
@@ -168,27 +286,151 @@ function createMcpServer() {
     'execute_script',
     {
       description:
-        'Run a script in the `run` QuickJS sandbox. Every tool on the upstream MCP server (`MCP_URL`) is available as `tools.<functionName>(args)`.',
-      inputSchema: { id },
+        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the upstream MCP server (`MCP_URL`) is available to it as `tools.<functionName>(args)`. Returns `{ value }`.',
+      inputSchema: {
+        id: scriptId.optional(),
+        name: scriptName.optional(),
+        input: z
+          .unknown()
+          .optional()
+          .describe("Validated against the script's inputSchema"),
+      },
       annotations: { openWorldHint: true },
     },
     async (args, extra) => {
-      const [script] = await getDb()
-        .select()
-        .from(scripts)
-        .where(eq(scripts.id, args.id))
+      const where = idOrName(scripts, args)
+
+      if (!where) {
+        return fail('Pass an id or a name')
+      }
+
+      const [script] = await getDb().select().from(scripts).where(where)
 
       if (!script) {
-        return notFound()
+        return scriptNotFound()
       }
 
       return upstream(async () => {
-        const result = await executeScript(script.source, extra.signal)
+        const result = await executeScript(script, args.input, extra.signal)
 
         return result.ok
           ? ok({ value: result.value })
           : fail(`${result.error.code}: ${result.error.message}`)
       })
+    },
+  )
+
+  server.registerTool(
+    'list_apps',
+    {
+      description: 'List apps with their URLs (without specs)',
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const rows = await getDb()
+        .select()
+        .from(apps)
+        .orderBy(desc(apps.updatedAt))
+
+      return ok({ apps: rows.map(toAppSummary) })
+    },
+  )
+
+  server.registerTool(
+    'get_app',
+    {
+      description: 'Get an app, including its spec and onLoad, by id or name',
+      inputSchema: { id: appId.optional(), name: appName.optional() },
+      annotations: { readOnlyHint: true },
+    },
+    async (args) => {
+      const where = idOrName(apps, args)
+
+      if (!where) {
+        return fail('Pass an id or a name')
+      }
+
+      const [app] = await getDb().select().from(apps).where(where)
+
+      return app ? ok(toAppJson(app)) : appNotFound()
+    },
+  )
+
+  server.registerTool(
+    'create_app',
+    {
+      description:
+        'Create an app: a json-render spec whose actions run scripts by name. Read get_app_guide first. The spec is validated (components, props, actions, script names, element tree) and rejected with a list of errors if invalid. Returns the app with its url.',
+      inputSchema: appFields,
+    },
+    async (args) => {
+      const errors = await appErrors(args)
+
+      if (errors.length > 0) {
+        return invalidApp(errors)
+      }
+
+      return uniqueName('app', async () => {
+        const [app] = await getDb().insert(apps).values(args).returning()
+
+        return ok(toAppJson(app))
+      })
+    },
+  )
+
+  server.registerTool(
+    'update_app',
+    {
+      description:
+        'Update an app. Fields left out are kept; spec and onLoad are replaced as a whole. Validated like create_app.',
+      inputSchema: { id: appId, ...z.object(appFields).partial().shape },
+      annotations: { idempotentHint: true },
+    },
+    async ({ id, ...values }) => {
+      const [existing] = await getDb()
+        .select()
+        .from(apps)
+        .where(eq(apps.id, id))
+
+      if (!existing) {
+        return appNotFound()
+      }
+
+      const errors = await appErrors({
+        spec: values.spec ?? existing.spec,
+        onLoad: values.onLoad ?? existing.onLoad,
+      })
+
+      if (errors.length > 0) {
+        return invalidApp(errors)
+      }
+
+      return uniqueName('app', async () => {
+        const [app] = await getDb()
+          .update(apps)
+          .set(values)
+          .where(eq(apps.id, id))
+          .returning()
+
+        return app ? ok(toAppJson(app)) : appNotFound()
+      })
+    },
+  )
+
+  server.registerTool(
+    'delete_app',
+    {
+      description: 'Delete an app (its scripts are kept)',
+      inputSchema: { id: appId },
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    async (args) => {
+      const [app] = await getDb()
+        .delete(apps)
+        .where(eq(apps.id, args.id))
+        .returning({ id: apps.id })
+
+      return app ? ok({ id: app.id }) : appNotFound()
     },
   )
 
@@ -200,6 +442,12 @@ function createMcpServer() {
  * server and transport, so nothing has to be kept between requests.
  */
 export async function handleMcpRequest(request: Request) {
+  // A stateless server never pushes messages, so it offers no standalone SSE
+  // stream; 405 tells clients not to hold one open.
+  if (request.method === 'GET') {
+    return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+  }
+
   const server = createMcpServer()
   const transport = new WebStandardStreamableHTTPServerTransport({
     sessionIdGenerator: undefined,

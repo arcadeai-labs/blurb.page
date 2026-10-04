@@ -4,7 +4,7 @@ This template is a PNPM/Turbo monorepo:
 
 - `packages/api`: the Hono (OpenAPI) app — the single source of truth for the API
 - `packages/cli`: the `template` CLI — dev servers and typed API access
-- `apps/frontend`: TanStack Start React app on a Cloudflare Worker
+- `apps/frontend`: TanStack Start React app on a Cloudflare Worker that renders apps
 - `apps/server`: Node server (`@hono/node-server`) that serves `packages/api`
 
 The API is Node-only: script execution uses the [`run`](https://www.run-sdk.dev)
@@ -19,10 +19,10 @@ HTTPS enabled:
 On non-`main` branches the branch slug is prepended to the hostname, for example
 `https://my-branch.frontend.localhost`.
 
-The frontend uses TanStack server functions for app-owned reads and mutations,
-and the Hono RPC client for the API. In dev the client calls the API on the
-current origin through the Vite proxy; set `VITE_API_BASE_URL` to point a
-deployed frontend at the deployed API.
+The frontend is a thin renderer: it talks to the API's MCP server (`/mcp`), the
+same interface agents use, to load apps and run their scripts. In dev it calls
+the API on the current origin through the Vite proxy (`/api` and `/mcp`); set
+`VITE_API_BASE_URL` to point a deployed frontend at the deployed API.
 
 ```sh
 pnpm dev:server     # just the API, at https://server.localhost
@@ -38,9 +38,13 @@ into valid identifiers, so `Gmail.ListEmails` becomes `tools.Gmail_ListEmails`.
 `GET /api/tools` lists them.
 
 ```js
-const emails = await tools.Gmail_ListEmails({ n_emails: 5 })
+const emails = await tools.Gmail_ListEmails({ n_emails: input.count })
 return emails
 ```
+
+Each script declares an `inputSchema` and `outputSchema` (JSON Schema). The
+input passed to `execute` is validated against `inputSchema` and is available to
+the script as `input`. Script names are unique slugs; apps run scripts by name.
 
 Tool results come back as structured content, or as parsed JSON text, or as plain
 text. Script failures, including tool errors, return
@@ -48,6 +52,24 @@ text. Script failures, including tool errors, return
 `Authorization: Bearer $ARCADE_API_KEY` and `Arcade-User-ID: $ARCADE_USER_ID`
 to the MCP server when those are set. `apps/server` reads the repo-root
 `.env.local` and `.env`.
+
+## Apps
+
+An app is a [json-render](https://json-render.dev) spec — a flat JSON tree of
+shadcn/ui components with state, visibility conditions and event bindings —
+served by the frontend at `/apps/<name>`. Its buttons, forms, watchers and
+`onLoad` hooks call scripts with the `runScript` action and render the results
+in tables, charts, metrics and forms.
+
+Apps are created and changed over MCP. An agent needs only the MCP URL
+(`http://127.0.0.1:8787/mcp`, or `/mcp` on the frontend origin): the server's
+instructions explain the workflow, and `get_app_guide` documents the spec
+format, every component and action, and common patterns with a full example.
+`create_app` / `update_app` validate specs (components, props, actions, script
+names and the element tree) and return readable errors.
+
+The catalog lives in `packages/api/src/ui` and is shared with the frontend as
+`@template/api/ui`.
 
 ## CLI
 
@@ -64,7 +86,8 @@ pnpm cli api docs --open     # Swagger UI
 pnpm cli api tools           # MCP tools available to scripts
 pnpm cli api scripts list
 pnpm cli api scripts create --name inbox --file inbox.js
-pnpm cli api scripts get|update|delete|execute <id>
+pnpm cli api scripts get|update|delete <id>
+pnpm cli api scripts execute <id> --input '{"count": 5}'
 ```
 
 `pnpm dev` is `pnpm cli dev`: it starts the portless HTTPS proxy, registers the

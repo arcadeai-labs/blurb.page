@@ -1,16 +1,9 @@
 // Drizzle table definitions. Run `pnpm db:generate` after changing this file.
 import { jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
 
-/** Saved scripts, executed in the `run` sandbox with MCP tools as functions. */
-export const scripts = pgTable('scripts', {
-  id: uuid('id').primaryKey().defaultRandom(),
-  name: text('name').notNull(),
-  description: text('description').notNull(),
-  inputSchema: jsonb('input_schema').$type<Record<string, unknown>>().notNull(),
-  outputSchema: jsonb('output_schema')
-    .$type<Record<string, unknown>>()
-    .notNull(),
-  source: text('source').notNull(),
+import type { ActionBinding, AppSpec } from '../ui/app'
+
+const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -18,6 +11,33 @@ export const scripts = pgTable('scripts', {
     .notNull()
     .defaultNow()
     .$onUpdate(() => new Date()),
+}
+
+/** Saved scripts, executed in the `run` sandbox with MCP tools as functions. */
+export const scripts = pgTable('scripts', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  // Apps run scripts by name.
+  name: text('name').notNull().unique(),
+  description: text('description').notNull(),
+  inputSchema: jsonb('input_schema').$type<Record<string, unknown>>().notNull(),
+  outputSchema: jsonb('output_schema')
+    .$type<Record<string, unknown>>()
+    .notNull(),
+  source: text('source').notNull(),
+  ...timestamps,
 })
 
 export type Script = typeof scripts.$inferSelect
+
+/** json-render UIs whose actions run scripts, served at `/apps/<name>`. */
+export const apps = pgTable('apps', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  spec: jsonb('spec').$type<AppSpec>().notNull(),
+  onLoad: jsonb('on_load').$type<ActionBinding[]>().notNull().default([]),
+  ...timestamps,
+})
+
+export type App = typeof apps.$inferSelect

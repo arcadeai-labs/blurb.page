@@ -2,6 +2,7 @@ import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { desc, eq } from 'drizzle-orm'
 
 import { getDb } from '../db'
+import { isUniqueViolation } from '../db/errors'
 import { type Script, scripts } from '../db/schema'
 import { executeScript } from '../execute'
 import { McpUnavailableError } from '../mcp'
@@ -38,6 +39,15 @@ const executeResultSchema = z
   ])
   .openapi('ExecuteResult')
 
+const executeScriptSchema = z
+  .object({
+    input: z
+      .unknown()
+      .optional()
+      .describe("Validated against the script's input schema"),
+  })
+  .openapi('ExecuteScript')
+
 const idParams = z.object({
   id: z.uuid().openapi({ param: { name: 'id', in: 'path' } }),
 })
@@ -48,6 +58,8 @@ const json = <T extends z.ZodType>(schema: T, description: string) => ({
 })
 
 const notFound = json(errorSchema, 'Script not found')
+
+const nameTaken = json(errorSchema, 'A script with that name already exists')
 
 function toJson(script: Script) {
   return {
@@ -71,7 +83,7 @@ const createScriptRoute = createRoute({
   request: {
     body: { content: { 'application/json': { schema: createScriptSchema } } },
   },
-  responses: { 201: json(scriptSchema, 'The created script') },
+  responses: { 201: json(scriptSchema, 'The created script'), 409: nameTaken },
 })
 
 const getRoute = createRoute({
@@ -90,7 +102,11 @@ const updateRoute = createRoute({
     params: idParams,
     body: { content: { 'application/json': { schema: updateScriptSchema } } },
   },
-  responses: { 200: json(scriptSchema, 'The updated script'), 404: notFound },
+  responses: {
+    200: json(scriptSchema, 'The updated script'),
+    404: notFound,
+    409: nameTaken,
+  },
 })
 
 const deleteRoute = createRoute({
@@ -106,8 +122,14 @@ const executeRoute = createRoute({
   path: '/{id}/execute',
   summary: 'Execute a script',
   description:
-    'Runs the script in the `run` QuickJS sandbox. Every tool on the MCP server at `MCP_URL` is available as `tools.<name>(args)`. Script failures are returned as `ok: false`.',
-  request: { params: idParams },
+    'Runs the script in the `run` QuickJS sandbox with `input` as a global. Every tool on the MCP server at `MCP_URL` is available as `tools.<name>(args)`. Invalid input and script failures are returned as `ok: false`.',
+  request: {
+    params: idParams,
+    body: {
+      required: false,
+      content: { 'application/json': { schema: executeScriptSchema } },
+    },
+  },
   responses: {
     200: json(executeResultSchema, 'The script result or its error'),
     404: notFound,
@@ -133,12 +155,19 @@ export const scriptsRoutes = new OpenAPIHono()
     return c.json(rows.map(toJson), 200)
   })
   .openapi(createScriptRoute, async (c) => {
-    const [script] = await getDb()
-      .insert(scripts)
-      .values(c.req.valid('json'))
-      .returning()
+    try {
+      const [script] = await getDb()
+        .insert(scripts)
+        .values(c.req.valid('json'))
+        .returning()
 
-    return c.json(toJson(script), 201)
+      return c.json(toJson(script), 201)
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return c.json({ error: 'A script with that name already exists' }, 409)
+      }
+      throw error
+    }
   })
   .openapi(getRoute, async (c) => {
     const script = await findScript(c.req.valid('param').id)
@@ -150,17 +179,24 @@ export const scriptsRoutes = new OpenAPIHono()
     return c.json(toJson(script), 200)
   })
   .openapi(updateRoute, async (c) => {
-    const [script] = await getDb()
-      .update(scripts)
-      .set(c.req.valid('json'))
-      .where(eq(scripts.id, c.req.valid('param').id))
-      .returning()
+    try {
+      const [script] = await getDb()
+        .update(scripts)
+        .set(c.req.valid('json'))
+        .where(eq(scripts.id, c.req.valid('param').id))
+        .returning()
 
-    if (!script) {
-      return c.json({ error: 'Script not found' }, 404)
+      if (!script) {
+        return c.json({ error: 'Script not found' }, 404)
+      }
+
+      return c.json(toJson(script), 200)
+    } catch (error) {
+      if (isUniqueViolation(error)) {
+        return c.json({ error: 'A script with that name already exists' }, 409)
+      }
+      throw error
     }
-
-    return c.json(toJson(script), 200)
   })
   .openapi(deleteRoute, async (c) => {
     const [script] = await getDb()
@@ -182,7 +218,15 @@ export const scriptsRoutes = new OpenAPIHono()
     }
 
     try {
-      return c.json(await executeScript(script.source, c.req.raw.signal), 200)
+      return c.json(
+        await executeScript(
+          script,
+          // Without a body this is `{}`, so the script runs with input `{}`.
+          c.req.valid('json').input,
+          c.req.raw.signal,
+        ),
+        200,
+      )
     } catch (error) {
       if (error instanceof McpUnavailableError) {
         return c.json({ error: error.message }, 503)

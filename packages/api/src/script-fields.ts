@@ -29,7 +29,7 @@ export const jsonSchema = z.record(z.string(), z.unknown()).refine(
 )
 
 export const scriptInputSchema = jsonSchema.describe(
-  'JSON Schema for the script input',
+  'JSON Schema for the script input, e.g. `{ "type": "object", "properties": { "id": { "type": "string" } }, "required": ["id"] }`. Input is validated against it before the script runs.',
 )
 
 export const scriptOutputSchema = jsonSchema.describe(
@@ -40,7 +40,7 @@ export const scriptSource = z
   .string()
   .min(1)
   .describe(
-    'JavaScript run in the sandbox, e.g. `return await tools.Gmail_ListEmails({ n_emails: 5 })`',
+    'Body of an async JavaScript function run in a sandbox. `input` holds the validated input, every upstream tool is `await tools.<functionName>(args)`, and the `return` value is the output, e.g. `return await tools.Gmail_ListEmails({ n_emails: input.count })`',
   )
 
 /** Fields accepted when creating a script; updates take any subset. */
