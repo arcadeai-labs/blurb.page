@@ -1,0 +1,34 @@
+{
+  "name": "@template/cli",
+  "version": "0.0.0",
+  "description": "CLI for the template monorepo: portless dev servers and typed API access.",
+  "type": "module",
+  "bin": {
+    "template": "./dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "typecheck": "tsc -b",
+    "prepublishOnly": "pnpm build"
+  },
+  "dependencies": {
+    "commander": "^15.0.0",
+    "hono": "^4.12.23"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260528.1",
+    "@template/api": "workspace:*",
+    "@types/node": "^24.12.3",
+    "tsdown": "^0.22.14",
+    "typescript": "~5.9.3"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "template-frontend",
+  "compatibility_date": "2026-05-28",
+  "compatibility_flags": ["nodejs_compat"],
+  // Wraps `@tanstack/react-start/server-entry` to also mount the Hono API.
+  "main": "./src/server.ts",
+  "observability": {
+    "enabled": true
+  }
+}

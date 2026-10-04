@@ -1,0 +1,27 @@
+{
+  "name": "template",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "packageManager": "pnpm@10.26.2",
+  "scripts": {
+    "cli": "node packages/cli/src/index.ts",
+    "dev": "pnpm cli dev",
+    "dev:server": "pnpm cli dev server",
+    "build": "turbo build",
+    "typecheck": "turbo typecheck",
+    "prepare": "git config core.hooksPath .githooks",
+    "fmt": "biome format --write .",
+    "lint": "biome lint .",
+    "preview": "turbo preview",
+    "deploy": "turbo deploy --filter=@template/frontend",
+    "deploy:server": "turbo deploy --filter=@template/server",
+    "cf-typegen": "turbo cf-typegen"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.16",
+    "biome-plugin-no-type-assertion": "^1.1.1",
+    "portless": "^0.14.0",
+    "turbo": "^2.6.1"
+  }
+}
