@@ -16,19 +16,17 @@ export const scriptDescription = z
   .describe('What the script does')
 
 /** A JSON Schema object; rejected if Zod can't interpret it as one. */
-export const jsonSchema = z
-  .record(z.string(), z.unknown())
-  .refine(
-    (schema) => {
-      try {
-        z.fromJSONSchema(schema)
-        return true
-      } catch {
-        return false
-      }
-    },
-    { error: 'Must be a valid JSON Schema' },
-  )
+export const jsonSchema = z.record(z.string(), z.unknown()).refine(
+  (schema) => {
+    try {
+      z.fromJSONSchema(schema)
+      return true
+    } catch {
+      return false
+    }
+  },
+  { error: 'Must be a valid JSON Schema' },
+)
 
 export const scriptInputSchema = jsonSchema.describe(
   'JSON Schema for the script input',
