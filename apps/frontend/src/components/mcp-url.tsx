@@ -47,12 +47,13 @@ export function McpUrl() {
   }
 
   return (
-    <InputGroup className="hidden w-64 md:flex">
+    <InputGroup className="hidden w-auto md:flex">
       <InputGroupInput
         readOnly
         value={url}
+        size={url.length}
         aria-label="MCP URL"
-        className="cursor-pointer font-mono"
+        className="w-auto cursor-pointer font-mono"
         onClick={copy}
       />
       <InputGroupAddon align="inline-end">

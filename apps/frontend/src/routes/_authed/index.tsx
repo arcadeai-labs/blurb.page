@@ -30,9 +30,9 @@ function Apps() {
     <Page>
       {appsQuery.isPending ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
-          <Skeleton className="h-32" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
         </div>
       ) : null}
 
@@ -60,9 +60,14 @@ function Apps() {
             <Card key={app.id}>
               <CardHeader>
                 <CardTitle>{app.title}</CardTitle>
-                <CardDescription>{app.description}</CardDescription>
+                <CardDescription
+                  className="line-clamp-2 min-h-10"
+                  title={app.description}
+                >
+                  {app.description}
+                </CardDescription>
               </CardHeader>
-              <CardFooter>
+              <CardFooter className="mt-auto">
                 <Button
                   variant="outline"
                   nativeButton={false}
