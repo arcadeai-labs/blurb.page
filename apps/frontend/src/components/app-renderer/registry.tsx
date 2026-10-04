@@ -12,6 +12,8 @@ import {
   RowTable,
   RowTableRow,
 } from './components'
+import { Markdown } from './markdown'
+import { Slide, Slides } from './slides'
 
 // Actions aren't registered here: AppRenderer handles them, since they need
 // the app's state store and form validation.
@@ -37,9 +39,12 @@ export const { registry } = defineRegistry(componentCatalog, {
     Chart,
     DataTable,
     JsonView,
+    Markdown,
     Metric,
     Query,
     RowTable,
     RowTableRow,
+    Slide,
+    Slides,
   },
 })

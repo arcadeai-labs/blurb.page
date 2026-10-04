@@ -59,7 +59,7 @@ import { useAppQueries } from './queries'
 
 type Definitions = typeof customComponentDefinitions
 
-type PropsOf<K extends keyof Definitions> = BaseComponentProps<
+export type PropsOf<K extends keyof Definitions> = BaseComponentProps<
   z.infer<Definitions[K]['props']>
 >
 
