@@ -1,5 +1,6 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
+import type { AuthEnv } from '../auth/routes'
 import { McpUnavailableError, toFunctionName, withMcpClient } from '../mcp'
 
 const toolSchema = z
@@ -20,7 +21,7 @@ const listToolsRoute = createRoute({
   summary: 'List the MCP tools available to scripts',
   responses: {
     200: {
-      description: 'Tools on the MCP server at `MCP_URL`',
+      description: "Tools on the user's MCP gateway",
       content: { 'application/json': { schema: z.array(toolSchema) } },
     },
     503: {
@@ -32,11 +33,14 @@ const listToolsRoute = createRoute({
   },
 })
 
-export const toolsRoutes = new OpenAPIHono().openapi(
+export const toolsRoutes = new OpenAPIHono<AuthEnv>().openapi(
   listToolsRoute,
   async (c) => {
     try {
-      const { tools } = await withMcpClient((client) => client.listTools())
+      const { tools } = await withMcpClient(
+        await c.var.mcpConnection(),
+        (client) => client.listTools(),
+      )
 
       return c.json(
         tools.map((tool) => ({

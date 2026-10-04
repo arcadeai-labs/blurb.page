@@ -22,7 +22,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/components/ui/toast'
 import { deleteDoc, getDoc, updateDoc } from '@/lib/mcp'
 
-export const Route = createFileRoute('/docs/$name')({
+export const Route = createFileRoute('/_authed/docs/$name')({
   component: DocPage,
 })
 

@@ -29,7 +29,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { createDoc, listDocs } from '@/lib/mcp'
 
-export const Route = createFileRoute('/docs/')({
+export const Route = createFileRoute('/_authed/docs/')({
   component: Docs,
 })
 

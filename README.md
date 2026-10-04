@@ -34,9 +34,11 @@ in a Docker container. On Vercel, set the project's root directory to
 `apps/frontend`; Nitro detects Vercel at build time and emits a Node function
 instead.
 
-Configure `DATABASE_URL`, `MCP_URL`, `ARCADE_API_KEY` and `ARCADE_USER_ID` in
-the environment, and run `pnpm db:migrate` against the database before
-deploying a schema change. App URLs use the request's origin; set
+Configure `DATABASE_URL`, `BETTER_AUTH_SECRET` (for example
+`openssl rand -base64 32`) and, to let users pick their gateway,
+`ARCADE_IDENTITY_CLIENT_ID` / `ARCADE_IDENTITY_CLIENT_SECRET` (see
+[Auth](#auth)) in the environment, and run `pnpm db:migrate` against the
+database before deploying a schema change. App URLs use the request's origin; set
 `FRONTEND_URL` when that differs from the public URL (for example behind a
 proxy that terminates TLS).
 
@@ -54,8 +56,9 @@ that deployment. To set it up:
 2. Turn on **Automatically delete obsolete Neon branches**, so a preview branch
    is removed after its Git branch is deleted. The integration also points
    Production and Development's `DATABASE_URL` at the default branch.
-3. Set `MCP_URL`, `ARCADE_API_KEY` and `ARCADE_USER_ID` for the Preview
-   environment in Vercel too.
+3. Set `BETTER_AUTH_SECRET` for the Preview environment in Vercel too. Arcade fetches each deployment's `/api/arcade/client.json` to
+   sign users in, so Vercel's Deployment Protection has to let that path
+   through (or be off for previews).
 
 `apps/frontend/vercel.json` runs `pnpm db:migrate` before the build on preview
 deployments only, so each branch gets the PR's migrations. Production is still
@@ -65,8 +68,8 @@ with a preview database: the integration matches Neon branches by name.
 ## Scripts
 
 `/api/scripts` is CRUD for saved scripts, and `POST /api/scripts/:id/execute`
-runs one in the `run` QuickJS sandbox. Every tool on the MCP server at
-`MCP_URL` is exposed to scripts as `tools.<functionName>(args)`. Names are made
+runs one in the `run` QuickJS sandbox. Every tool on the user's MCP gateway
+is exposed to scripts as `tools.<functionName>(args)`. Names are made
 into valid identifiers, so `Gmail.ListEmails` becomes `tools.Gmail_ListEmails`.
 `GET /api/tools` lists them.
 
@@ -81,10 +84,63 @@ the script as `input`. Script names are unique slugs; apps run scripts by name.
 
 Tool results come back as structured content, or as parsed JSON text, or as plain
 text. Script failures, including tool errors, return
-`{ ok: false, error: { code, message } }`. The server sends
-`Authorization: Bearer $ARCADE_API_KEY` and `Arcade-User-ID: $ARCADE_USER_ID`
-to the MCP server when those are set. The dev server and `pnpm start` read the
-repo-root `.env.local` and `.env`.
+`{ ok: false, error: { code, message } }`. Scripts run as the signed-in user:
+the server calls the MCP server with that user's Arcade access token (see
+[Auth](#auth)). The dev server and `pnpm start` read the repo-root `.env.local`
+and `.env`.
+
+## Auth
+
+Anyone with an Arcade account signs in with it, the way MCP clients sign in to
+Arcade's gateways, and their tool calls run as them, on an MCP gateway they
+pick. every-ui signs users in with two of Arcade's authorization servers,
+linked to one user:
+
+- **`arcade`**, the OAuth server MCP clients use (`$ARCADE_CLOUD_URL/oauth2`).
+  Every Arcade account can authorize clients on it, so this is the sign-in.
+  Its access token identifies the user (its `sub` and `email`) and calls their
+  MCP gateway. Nothing has to be set up on Arcade's side.
+- **`arcade-identity`**, Arcade's identity provider (`$ARCADE_IDENTITY_URL`),
+  which the dashboard signs in with. It's linked right after sign-in (the same
+  Arcade login, so it passes straight through) and reads the user's
+  organizations, projects and gateways from Arcade's APIs, which don't take
+  MCP tokens. It needs an OAuth2 client in Arcade's Ory project:
+  `ARCADE_IDENTITY_CLIENT_ID` and `ARCADE_IDENTITY_CLIENT_SECRET`, with
+  `client_secret_post`, JWT access tokens and these redirect URIs:
+  `<origin>/api/auth/callback/arcade-identity` for each deployed origin, and
+  `http://127.0.0.1:5173/api/auth/callback/arcade-identity` and
+  `http://127.0.0.1:5173/api/arcade/identity-callback` for the dev server.
+  Without it, everyone uses the default gateway.
+
+Users pick a gateway at `/gateway`: any gateway in their projects that signs
+users in with Arcade (gateways that take an API key can't run tools as them).
+Their choice is kept in `user_gateways`; until they pick one, tool calls go to
+`MCP_URL`, or else Arcade's global gateway (`$ARCADE_API_URL/mcp/arcade`),
+which runs tools in their default project.
+
+Arcade's URLs default to production. `ARCADE_CLOUD_URL`, `ARCADE_API_URL` and
+`ARCADE_IDENTITY_URL` point every-ui at another stack, for example staging
+(`https://cloud.bosslevel.dev`, `https://api.bosslevel.dev` and
+`https://auth.bosslevel.dev`); set all three together, since accounts don't
+carry over between stacks.
+
+[Better Auth](https://www.better-auth.com) (`packages/api/src/auth`, mounted at
+`/api/auth`) keeps users, sessions and the encrypted Arcade tokens in Postgres,
+and refreshes the tokens when they expire. Everything under `/api`, except auth
+itself, needs a signed-in user, and so does `/mcp`:
+
+- The frontend calls `/mcp` with its session cookie.
+- Other MCP clients (agents) use OAuth: every-ui is also an authorization
+  server for its own `/mcp` (Better Auth's MCP plugin), so a client registers
+  itself, sends the user to `/login` and `/consent`, and then acts as them.
+
+Arcade's MCP OAuth server identifies every-ui by a client ID per origin. On a
+public origin it's the URL of a client metadata document every-ui serves
+(`/api/arcade/client.json`), which Arcade fetches. Arcade can't fetch a local
+one, so the dev server registers a client instead and keeps it in the
+`arcade_clients` table. Arcade only redirects over http to bare loopback hosts,
+so signing in on the portless `https://*.localhost` URL goes back through
+`http://127.0.0.1:$PORT`, which forwards to the portless URL.
 
 ## Apps
 
@@ -97,7 +153,8 @@ rendered in tables, charts, metrics and forms; data is only read inside a
 `Query` element, so loading and error states are always handled.
 
 Apps are created and changed over MCP. An agent needs only the MCP URL
-(`http://127.0.0.1:5173/mcp` in dev, or `/mcp` on the deployed origin): the server's
+(`http://127.0.0.1:5173/mcp` in dev, or `/mcp` on the deployed origin) and
+signs in when it connects: the server's
 instructions explain the workflow, and `get_app_guide` documents the spec
 format, every component and action, and common patterns with a full example.
 `create_app` / `update_app` validate specs (components, props, actions, script
@@ -152,7 +209,8 @@ directly (`pnpm --filter @template/frontend dev`) skips portless and serves
 plain HTTP on port 5173.
 
 The `api` commands call the same Hono app through the typed RPC client, so they
-stay in sync with `packages/api`. They target `--base-url`, or `$TEMPLATE_API_BASE_URL`, or the
+stay in sync with `packages/api`. They can't sign in yet, so everything but
+`openapi` and `docs` answers 401 now that the API needs a signed-in user. They target `--base-url`, or `$TEMPLATE_API_BASE_URL`, or the
 portless app URL. Node does not read the system trust
 store, so the CLI adds the portless CA (`~/.portless/ca.pem`) to its own trust
 list to reach `https://*.localhost`.

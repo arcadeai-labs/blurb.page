@@ -1,7 +1,7 @@
 import { createRunner, RunError } from 'run'
 import { z } from 'zod'
 
-import { mcpHostFunctions, withMcpClient } from './mcp'
+import { type McpConnection, mcpHostFunctions, withMcpClient } from './mcp'
 import { authorizationRequired, type ScriptError } from './script-error'
 
 const runner = createRunner({ limits: { timeoutMs: 60_000 } })
@@ -11,14 +11,16 @@ export type ExecuteResult =
   | { ok: false; error: ScriptError }
 
 /**
- * Runs a script in the QuickJS sandbox with `input` as a global and the MCP
- * server's tools available as `tools.*`. Invalid input and guest failures
- * come back as `ok: false`, not as exceptions. A failed run whose tool call
+ * Runs a script in the QuickJS sandbox with `input` as a global and the
+ * tools on the user's MCP gateway (`connection`) available as `tools.*`.
+ * Invalid input and guest failures come back as `ok: false`, not as
+ * exceptions. A failed run whose tool call
  * needed authorization is reported as `AUTHORIZATION_REQUIRED`, even if the
  * script caught and rethrew the tool's error.
  */
 export async function executeScript(
   script: { source: string; inputSchema: Record<string, unknown> },
+  connection: McpConnection,
   input: unknown = {},
   abortSignal?: AbortSignal,
 ): Promise<ExecuteResult> {
@@ -34,7 +36,7 @@ export async function executeScript(
   // JSON is a valid JS expression, so the input is inlined as a constant.
   const source = `const input = ${JSON.stringify(parsed.data ?? null)};\n${script.source}`
 
-  return withMcpClient(async (client) => {
+  return withMcpClient(connection, async (client) => {
     let authorization: { toolName: string; url: string } | undefined
 
     try {

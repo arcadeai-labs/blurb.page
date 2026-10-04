@@ -3,46 +3,33 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { type HostFunctionGroup, RunHostFunctionError } from 'run'
 import { z } from 'zod'
 
-/** `MCP_URL` is missing, or the MCP server couldn't be reached. */
+/** The user's MCP gateway couldn't be reached. */
 export class McpUnavailableError extends Error {
   name = 'McpUnavailableError'
 }
 
-/** Gateway auth headers (`Authorization` + `Arcade-User-ID`), when configured. */
-function mcpHeaders() {
-  const headers: Record<string, string> = {}
+/** An MCP gateway, and the user's Arcade token to call it with. */
+export type McpConnection = { url: string; accessToken: string }
 
-  if (process.env.ARCADE_API_KEY) {
-    headers.Authorization = `Bearer ${process.env.ARCADE_API_KEY}`
-  }
-  if (process.env.ARCADE_USER_ID) {
-    headers['Arcade-User-ID'] = process.env.ARCADE_USER_ID
-  }
-
-  return headers
-}
-
-/** Connects to the MCP server at `MCP_URL` for the duration of `fn`. */
+/**
+ * Connects to the user's MCP gateway for the duration of `fn`, as the user
+ * whose Arcade token `connection` carries.
+ */
 export async function withMcpClient<T>(
+  { url, accessToken }: McpConnection,
   fn: (client: Client) => Promise<T>,
 ): Promise<T> {
-  const url = process.env.MCP_URL
-
-  if (!url) {
-    throw new McpUnavailableError('MCP_URL is not configured')
-  }
-
   const client = new Client({ name: 'template-api', version: '0.0.0' })
 
   try {
     await client.connect(
       new StreamableHTTPClientTransport(new URL(url), {
-        requestInit: { headers: mcpHeaders() },
+        requestInit: { headers: { Authorization: `Bearer ${accessToken}` } },
       }),
     )
   } catch (error) {
     throw new McpUnavailableError(
-      `Could not connect to the MCP server: ${error instanceof Error ? error.message : error}`,
+      `Could not connect to the MCP gateway at ${url}: ${error instanceof Error ? error.message : error}`,
       { cause: error },
     )
   }

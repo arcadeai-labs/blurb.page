@@ -1,6 +1,7 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 import { desc, eq } from 'drizzle-orm'
 
+import type { AuthEnv } from '../auth/routes'
 import { getDb } from '../db'
 import { isUniqueViolation } from '../db/errors'
 import { type Script, scripts } from '../db/schema'
@@ -120,7 +121,7 @@ const executeRoute = createRoute({
   path: '/{id}/execute',
   summary: 'Execute a script',
   description:
-    'Runs the script in the `run` QuickJS sandbox with `input` as a global. Every tool on the MCP server at `MCP_URL` is available as `tools.<name>(args)`. Invalid input and script failures are returned as `ok: false`; a tool the user has not authorized yet fails with `AUTHORIZATION_REQUIRED` and an `authorizationUrl`.',
+    'Runs the script in the `run` QuickJS sandbox with `input` as a global. Every tool on the MCP gateway the user picked is available as `tools.<name>(args)`. Invalid input and script failures are returned as `ok: false`; a tool the user has not authorized yet fails with `AUTHORIZATION_REQUIRED` and an `authorizationUrl`.',
   request: {
     params: idParams,
     body: {
@@ -143,7 +144,7 @@ async function findScript(id: string) {
   return script
 }
 
-export const scriptsRoutes = new OpenAPIHono()
+export const scriptsRoutes = new OpenAPIHono<AuthEnv>()
   .openapi(listRoute, async (c) => {
     const rows = await getDb()
       .select()
@@ -219,6 +220,7 @@ export const scriptsRoutes = new OpenAPIHono()
       return c.json(
         await executeScript(
           script,
+          await c.var.mcpConnection(),
           // Without a body this is `{}`, so the script runs with input `{}`.
           c.req.valid('json').input,
           c.req.raw.signal,
