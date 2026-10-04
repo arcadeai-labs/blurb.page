@@ -2,12 +2,11 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js'
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js'
 import { appSchema, appSummarySchema } from '@template/api/ui'
 import { z } from 'zod'
-import { apiBaseUrl } from './api-url'
 
 // The frontend talks to the API's MCP server, the same interface agents use
 // to build apps: apps are loaded with `get_app` and run scripts with
-// `execute_script`. In dev, Vite proxies `/mcp` to the API server.
-export const mcpPath = `${apiBaseUrl}/mcp`
+// `execute_script`. This server serves it at `/mcp` (see `routes/mcp.ts`).
+export const mcpPath = '/mcp'
 
 let connection: Promise<Client> | undefined
 

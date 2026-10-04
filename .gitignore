@@ -12,8 +12,9 @@ node_modules
 dist
 dist-ssr
 *.local
-.wrangler
-.dev.vars*
+.output
+.nitro
+.vercel
 
 # Editor directories and files
 .vscode/*

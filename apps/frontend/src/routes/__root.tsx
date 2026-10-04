@@ -12,7 +12,6 @@ import { Button } from '@/components/ui/button'
 import { Separator } from '@/components/ui/separator'
 import { Toaster } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
-import { apiDocsUrl } from '@/lib/api-url'
 import '../index.css'
 
 const queryClient = new QueryClient()
@@ -55,7 +54,7 @@ function RootLayout() {
                     </Link>
                   </Button>
                   <Button variant="ghost" asChild>
-                    <a href={apiDocsUrl}>API Docs</a>
+                    <a href="/api">API Docs</a>
                   </Button>
                 </nav>
               </div>

@@ -1,6 +1,6 @@
 import { spawn, spawnSync } from 'node:child_process'
 import type { Command } from 'commander'
-import { APP_NAMES, APP_PORTS, type AppName, isAppName } from '../lib/apps.ts'
+import { APP_NAME, APP_PORT } from '../lib/apps.ts'
 import { openBrowser } from '../lib/browser.ts'
 import { localMcpUrl, writeMcpConfig } from '../lib/mcp-config.ts'
 import { getPortlessRoute } from '../lib/portless.ts'
@@ -43,91 +43,70 @@ function killPort(port: number) {
 
 type DevOptions = { open: boolean; host: string }
 
-/** Registers `app`'s portless alias and starts its `dev` script behind it. */
-function startApp(app: AppName, options: DevOptions, repoRoot: string) {
-  const { routeName, url } = getPortlessRoute(app, repoRoot)
-  const port = APP_PORTS[app]
+/** Registers the app's portless alias and starts its `dev` script behind it. */
+function startApp(options: DevOptions, repoRoot: string) {
+  const { routeName, url } = getPortlessRoute(APP_NAME, repoRoot)
 
-  killPort(port)
+  killPort(APP_PORT)
   run(
-    ['exec', 'portless', 'alias', routeName, String(port), '--force'],
+    ['exec', 'portless', 'alias', routeName, String(APP_PORT), '--force'],
     repoRoot,
   )
 
   const env = { ...process.env }
-  env.PORT = String(port)
+  env.PORT = String(APP_PORT)
   env.HOST = options.host
   // The dev server is reached through the portless HTTPS proxy, so clients
   // (for example Vite's HMR socket) have to be pointed at that hostname,
   // not the port.
   env.PORTLESS_HOST = `${routeName}.localhost`
-  // The frontend proxies `/api` and `/mcp` to the Node API server.
-  env.API_ORIGIN = `http://${options.host}:${APP_PORTS.server}`
-  // The MCP server links to apps on the frontend.
-  env.FRONTEND_URL = getPortlessRoute('frontend', repoRoot).url
+  // The MCP server links to apps on the portless URL, not the loopback
+  // address MCP clients reach it at.
+  env.FRONTEND_URL = url
 
-  const child = spawn('pnpm', ['--filter', `@template/${app}`, 'run', 'dev'], {
-    cwd: repoRoot,
-    env,
-    stdio: 'inherit',
-    shell: isWindows,
-  })
+  const child = spawn(
+    'pnpm',
+    ['--filter', `@template/${APP_NAME}`, 'run', 'dev'],
+    { cwd: repoRoot, env, stdio: 'inherit', shell: isWindows },
+  )
 
-  console.log(`\n  ${app} → ${url}\n`)
+  console.log(`\n  ${APP_NAME} → ${url}\n`)
 
-  return { app, child, routeName, url }
+  return { child, routeName, url }
 }
 
 export function registerDevCommand(program: Command) {
   program
     .command('dev')
-    .description('Run apps behind the portless HTTPS proxy')
-    .argument('[apps...]', `apps to run (${APP_NAMES.join(', ')})`, [
-      'server',
-      'frontend',
-    ])
+    .description('Run the app (UI, API and MCP server) behind portless')
     .option('--no-open', 'do not open the browser once the URL is reachable')
     .option('--host <host>', 'address the dev server binds to', '127.0.0.1')
-    .action((apps: string[], options: DevOptions) => {
-      for (const app of apps) {
-        if (!isAppName(app)) {
-          throw new Error(
-            `Unknown app "${app}". Expected one of: ${APP_NAMES.join(', ')}.`,
-          )
-        }
-      }
-
+    .action((options: DevOptions) => {
       const repoRoot = requireRepoRoot()
       run(['exec', 'portless', 'proxy', 'start', '--https'], repoRoot)
 
-      const running = apps
-        .filter(isAppName)
-        .map((app) => startApp(app, options, repoRoot))
+      const { child, routeName, url } = startApp(options, repoRoot)
 
       // Point MCP clients opened in this checkout (e.g. Claude Code) at the
-      // API server that was just started.
-      if (running.some(({ app }) => app === 'server')) {
-        const mcpUrl = localMcpUrl(options.host, APP_PORTS.server)
-        const changed = writeMcpConfig(repoRoot, mcpUrl)
+      // MCP server that was just started.
+      const mcpUrl = localMcpUrl(options.host, APP_PORT)
+      const changed = writeMcpConfig(repoRoot, mcpUrl)
 
-        console.log(
-          `  mcp → ${mcpUrl}${changed ? ' (updated .mcp.json; reconnect your MCP client)' : ''}\n`,
-        )
-      }
-      // Open the frontend when it's running, otherwise the API docs.
-      const opened = running.find(({ app }) => app === 'frontend') ?? running[0]
-      const openUrl = opened.app === 'server' ? `${opened.url}/api` : opened.url
+      console.log(
+        `  mcp → ${mcpUrl}${changed ? ' (updated .mcp.json; reconnect your MCP client)' : ''}\n`,
+      )
+
       const readyController = new AbortController()
 
-      // Watching for readiness must never take the dev servers down with it.
-      waitForUrl(openUrl, { signal: readyController.signal })
+      // Watching for readiness must never take the dev server down with it.
+      waitForUrl(url, { signal: readyController.signal })
         .then((ready) => {
           if (!ready) {
             return
           }
-          console.log(`  ready at ${openUrl}`)
+          console.log(`  ready at ${url}`)
           if (options.open) {
-            openBrowser(openUrl)
+            openBrowser(url)
           }
         })
         .catch(() => {})
@@ -139,37 +118,28 @@ export function registerDevCommand(program: Command) {
         }
         cleanedUp = true
         readyController.abort()
-        for (const { routeName } of running) {
-          run(
-            ['exec', 'portless', 'alias', '--remove', routeName],
-            repoRoot,
-            true,
-          )
-        }
-      }
-
-      function stopAll(signal: NodeJS.Signals) {
-        cleanup()
-        for (const { child } of running) {
-          child.kill(signal)
-        }
+        run(
+          ['exec', 'portless', 'alias', '--remove', routeName],
+          repoRoot,
+          true,
+        )
       }
 
       const forwardedSignals: NodeJS.Signals[] = ['SIGINT', 'SIGTERM']
       for (const signal of forwardedSignals) {
-        process.on(signal, () => stopAll(signal))
-      }
-
-      // When one app exits, take the others down with it.
-      for (const { child } of running) {
-        child.on('exit', (code, signal) => {
-          stopAll('SIGTERM')
-          if (signal) {
-            process.kill(process.pid, signal)
-            return
-          }
-          process.exit(code ?? 0)
+        process.on(signal, () => {
+          cleanup()
+          child.kill(signal)
         })
       }
+
+      child.on('exit', (code, signal) => {
+        cleanup()
+        if (signal) {
+          process.kill(process.pid, signal)
+          return
+        }
+        process.exit(code ?? 0)
+      })
     })
 }

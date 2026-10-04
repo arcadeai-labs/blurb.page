@@ -7,20 +7,17 @@
   "scripts": {
     "cli": "node packages/cli/src/index.ts",
     "dev": "pnpm cli dev",
-    "dev:server": "pnpm cli dev server",
     "build": "turbo build",
     "typecheck": "turbo typecheck",
     "prepare": "git config core.hooksPath .githooks",
     "fmt": "biome format --write .",
     "lint": "biome lint .",
     "preview": "turbo preview",
-    "deploy": "turbo deploy --filter=@template/frontend",
-    "cf-typegen": "turbo cf-typegen",
     "db:generate": "pnpm --filter @template/api db:generate",
     "db:migrate": "pnpm --filter @template/api db:migrate",
     "db:studio": "pnpm --filter @template/api db:studio",
     "db:local": "pnpm --filter @template/api db:local",
-    "start": "pnpm --filter @template/server start"
+    "start": "pnpm --filter @template/frontend start"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.16",

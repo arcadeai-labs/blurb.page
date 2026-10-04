@@ -3,32 +3,32 @@ import { type App, apps, scripts } from './db/schema'
 import type { ActionBinding, AppSpec } from './ui/app'
 import { referencedScripts, validateApp } from './ui/validate'
 
-/** Where the frontend that renders apps is served. */
-export function frontendUrl() {
-  return (process.env.FRONTEND_URL ?? 'http://127.0.0.1:5173').replace(
+/**
+ * Where apps are rendered. The frontend serves the API, so that's the origin
+ * `request` came in on, unless `FRONTEND_URL` overrides it (for example behind
+ * a proxy that terminates TLS).
+ */
+export function frontendUrl(request: Request) {
+  return (process.env.FRONTEND_URL ?? new URL(request.url).origin).replace(
     /\/$/,
     '',
   )
 }
 
-export function appUrl(name: string) {
-  return `${frontendUrl()}/apps/${name}`
-}
-
-export function toAppSummary(app: App) {
+export function toAppSummary(app: App, baseUrl: string) {
   return {
     id: app.id,
     name: app.name,
     title: app.title,
     description: app.description,
-    url: appUrl(app.name),
+    url: `${baseUrl}/apps/${app.name}`,
     updatedAt: app.updatedAt.toISOString(),
   }
 }
 
-export function toAppJson(app: App) {
+export function toAppJson(app: App, baseUrl: string) {
   return {
-    ...toAppSummary(app),
+    ...toAppSummary(app, baseUrl),
     spec: app.spec,
     onLoad: app.onLoad,
     createdAt: app.createdAt.toISOString(),
