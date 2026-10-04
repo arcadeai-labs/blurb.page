@@ -8,6 +8,7 @@ import {
   DataTable,
   JsonView,
   Metric,
+  Query,
   RowTable,
   RowTableRow,
 } from './components'
@@ -37,6 +38,7 @@ export const { registry } = defineRegistry(componentCatalog, {
     DataTable,
     JsonView,
     Metric,
+    Query,
     RowTable,
     RowTableRow,
   },

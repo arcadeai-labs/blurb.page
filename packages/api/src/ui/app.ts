@@ -86,6 +86,78 @@ export const elementSchema = z.strictObject({
 
 export type AppElement = z.infer<typeof elementSchema>
 
+/** Query and mutation names, used in state paths such as `/queries/<name>`. */
+export const operationName = z.string().regex(/^[A-Za-z][A-Za-z0-9_-]*$/, {
+  error: 'Name must start with a letter and use only letters, digits, _ and -',
+})
+
+export const querySchema = z
+  .strictObject({
+    script: z.string().describe('Name of the script to run'),
+    input: z
+      .unknown()
+      .optional()
+      .describe(
+        'Script input; may use { "$state": "/path" } expressions, and the query refetches when they change',
+      ),
+    enabled: VisibilityConditionSchema.optional().describe(
+      'Only run while this condition holds (same syntax as visible)',
+    ),
+    refetchInterval: z
+      .number()
+      .int()
+      .min(1000)
+      .optional()
+      .describe('Poll every this many milliseconds'),
+  })
+  .describe(
+    'Data the app reads: the script runs when the app opens and whenever its input changes. Read it at /queries/<name> inside a Query element.',
+  )
+
+export type AppQuery = z.infer<typeof querySchema>
+
+export const mutationSchema = z
+  .strictObject({
+    script: z.string().describe('Name of the script to run'),
+    input: z
+      .unknown()
+      .optional()
+      .describe(
+        'Script input; may use { "$state": "/path" } expressions, resolved when the mutation runs. Input passed to the mutate action is merged over it.',
+      ),
+    invalidates: z
+      .array(operationName)
+      .optional()
+      .describe('Queries to refetch after the mutation succeeds'),
+  })
+  .describe(
+    'A change the app makes, run by the mutate action. Its status is at /mutations/<name>.',
+  )
+
+export type AppMutation = z.infer<typeof mutationSchema>
+
+/**
+ * State the renderer keeps up to date for each query, at `/queries/<name>`.
+ * `idle` means the query is disabled and has no data.
+ */
+export type QueryState = {
+  status: 'idle' | 'pending' | 'error' | 'success'
+  data: unknown
+  error: string | null
+  isFetching: boolean
+}
+
+/** State the renderer keeps up to date for each mutation, at `/mutations/<name>`. */
+export type MutationState = {
+  status: 'idle' | 'pending' | 'error' | 'success'
+  data: unknown
+  error: string | null
+  isPending: boolean
+}
+
+/** Top-level state keys the renderer owns; specs may read but not write them. */
+export const reservedStateKeys = ['queries', 'mutations'] as const
+
 export const specSchema = z
   .object({
     root: z.string().describe('Key of the root element'),
@@ -95,6 +167,14 @@ export const specSchema = z
     state: record
       .optional()
       .describe('Initial state model, read and written with JSON Pointers'),
+    queries: z
+      .record(operationName, querySchema)
+      .optional()
+      .describe('Named queries: scripts that load data, by name'),
+    mutations: z
+      .record(operationName, mutationSchema)
+      .optional()
+      .describe('Named mutations: scripts that change data, by name'),
   })
   .describe('A json-render spec (flat element map). See get_app_guide.')
 
