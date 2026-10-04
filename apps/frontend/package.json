@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite dev --host ${HOST:-127.0.0.1} --port ${PORT:-5173}",
     "build": "vite build && tsc -b",
-    "typecheck": "tsc -b",
+    "routes:generate": "node scripts/generate-routes.ts",
+    "typecheck": "pnpm routes:generate && tsc -b",
     "preview": "vite preview",
     "start": "node --env-file-if-exists=../../.env --env-file-if-exists=../../.env.local .output/server/index.mjs"
   },
