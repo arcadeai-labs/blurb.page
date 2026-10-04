@@ -5,12 +5,15 @@ import { getDb } from '../db'
 import { type Script, scripts } from '../db/schema'
 import { executeScript } from '../execute'
 import { McpUnavailableError } from '../mcp'
+import { scriptFields } from '../script-fields'
 
 const scriptSchema = z
   .object({
     id: z.uuid(),
     name: z.string(),
-    description: z.string().nullable(),
+    description: z.string(),
+    inputSchema: z.record(z.string(), z.unknown()),
+    outputSchema: z.record(z.string(), z.unknown()),
     source: z.string().openapi({
       example: 'return await tools.Gmail_ListEmails({ n_emails: 5 })',
     }),
@@ -19,13 +22,7 @@ const scriptSchema = z
   })
   .openapi('Script')
 
-const createScriptSchema = z
-  .object({
-    name: z.string().min(1),
-    description: z.string().nullable().optional(),
-    source: z.string().min(1),
-  })
-  .openapi('CreateScript')
+const createScriptSchema = z.object(scriptFields).openapi('CreateScript')
 
 const updateScriptSchema = createScriptSchema.partial().openapi('UpdateScript')
 

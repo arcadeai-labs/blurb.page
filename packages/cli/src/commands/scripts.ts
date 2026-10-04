@@ -13,6 +13,8 @@ type ScriptOptions = BaseOptions & {
   name?: string
   description?: string
   file?: string
+  inputSchema?: string
+  outputSchema?: string
 }
 
 const BASE_URL_HELP =
@@ -29,16 +31,24 @@ function withScriptOptions(command: Command) {
     .option('--name <name>', 'script name')
     .option('--description <text>', 'script description')
     .option('--file <path>', 'file with the script source')
+    .option('--input-schema <path>', 'JSON file with the input JSON Schema')
+    .option('--output-schema <path>', 'JSON file with the output JSON Schema')
 }
 
 function printJson(value: unknown) {
   console.log(JSON.stringify(value, null, 2))
 }
 
+function readJsonFile(path: string | undefined) {
+  return path ? JSON.parse(readFileSync(path, 'utf8')) : undefined
+}
+
 function scriptBody(options: ScriptOptions) {
   return {
     name: options.name,
     description: options.description,
+    inputSchema: readJsonFile(options.inputSchema),
+    outputSchema: readJsonFile(options.outputSchema),
     source: options.file ? readFileSync(options.file, 'utf8') : undefined,
   }
 }
@@ -107,17 +117,22 @@ export function registerScriptCommands(api: Command) {
   withScriptOptions(
     scripts.command('create').description('POST /api/scripts'),
   ).action(async (options: ScriptOptions) => {
-    const { name, description, source } = scriptBody(options)
+    const { name, description, inputSchema, outputSchema, source } =
+      scriptBody(options)
 
-    if (!name || !source) {
-      throw new Error('--name and --file are required')
+    if (!name || !description || !inputSchema || !outputSchema || !source) {
+      throw new Error(
+        '--name, --description, --input-schema, --output-schema and --file are required',
+      )
     }
 
     const script = await withApi(
       resolveBaseUrl(options.baseUrl),
       async (client) =>
         readJson(
-          await client.scripts.$post({ json: { name, description, source } }),
+          await client.scripts.$post({
+            json: { name, description, inputSchema, outputSchema, source },
+          }),
         ),
     )
 

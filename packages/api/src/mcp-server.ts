@@ -8,6 +8,7 @@ import { getDb } from './db'
 import { type Script, scripts } from './db/schema'
 import { executeScript } from './execute'
 import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
+import { scriptFields } from './script-fields'
 
 function toJson(script: Script) {
   return {
@@ -119,16 +120,7 @@ function createMcpServer() {
     'create_script',
     {
       description: 'Create a script',
-      inputSchema: {
-        name: z.string().min(1),
-        description: z.string().nullable().optional(),
-        source: z
-          .string()
-          .min(1)
-          .describe(
-            'JavaScript run in the sandbox, e.g. `return await tools.Gmail_ListEmails({ n_emails: 5 })`',
-          ),
-      },
+      inputSchema: scriptFields,
     },
     async (args) => {
       const [script] = await getDb().insert(scripts).values(args).returning()
@@ -141,12 +133,7 @@ function createMcpServer() {
     'update_script',
     {
       description: 'Update a script',
-      inputSchema: {
-        id,
-        name: z.string().min(1).optional(),
-        description: z.string().nullable().optional(),
-        source: z.string().min(1).optional(),
-      },
+      inputSchema: { id, ...z.object(scriptFields).partial().shape },
       annotations: { idempotentHint: true },
     },
     async ({ id, ...values }) => {
