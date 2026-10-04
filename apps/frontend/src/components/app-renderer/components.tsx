@@ -55,6 +55,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
+import { AuthorizeButton } from './authorization'
 import { useAppQueries } from './queries'
 
 type Definitions = typeof customComponentDefinitions
@@ -411,7 +412,15 @@ export function Query({ props, children }: PropsOf<'Query'>) {
     case 'pending':
       return <Skeleton className="h-24" />
     case 'error':
-      return (
+      return query.authorizationUrl ? (
+        <Alert>
+          <AlertTitle>Authorization required</AlertTitle>
+          <AlertDescription>{query.error}</AlertDescription>
+          <AlertAction>
+            <AuthorizeButton url={query.authorizationUrl} />
+          </AlertAction>
+        </Alert>
+      ) : (
         <Alert variant="destructive">
           <AlertTitle>Could not load data</AlertTitle>
           <AlertDescription>{query.error}</AlertDescription>
