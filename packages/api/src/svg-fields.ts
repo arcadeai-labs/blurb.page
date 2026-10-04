@@ -2,16 +2,11 @@
 // results with `svgSchema`.
 import { z } from 'zod'
 
-/** Lowercase words joined by single hyphens, e.g. `runtime-diagram`. */
-export const svgName = z
-  .string()
-  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
-    error: 'Name must be a slug: lowercase letters, digits and single hyphens',
-  })
-  .max(64)
-  .describe(
-    'Slug-friendly name; apps show it with { "type": "Svg", "props": { "name": "<name>" } }',
-  )
+import { slug } from './ui/app'
+
+export const svgName = slug.describe(
+  'Slug-friendly name; apps show it with { "type": "Svg", "props": { "name": "<name>" } }',
+)
 
 export const svgDescription = z
   .string()

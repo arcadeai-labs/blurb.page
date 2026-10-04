@@ -614,6 +614,28 @@ export function referencedScripts(app: {
   return names
 }
 
+/**
+ * Validates a component embedded in a doc: an app spec, except that a
+ * ScrollArea needs a height, since a doc scrolls rather than fitting the
+ * window.
+ */
+export function validateEmbed(
+  spec: AppSpec,
+  existing: { scripts: ReadonlySet<string>; svgs: ReadonlySet<string> },
+) {
+  const errors = validateApp({ spec }, existing)
+
+  for (const [key, element] of Object.entries(spec.elements)) {
+    if (element.type === 'ScrollArea' && element.props.height == null) {
+      errors.push(
+        `elements.${key} (ScrollArea): needs a height in a doc, which scrolls instead of filling the window`,
+      )
+    }
+  }
+
+  return errors
+}
+
 /** Names of the SVGs an app shows with a literal Svg name. */
 export function referencedSvgs(app: { spec: AppSpec }) {
   return new Set(

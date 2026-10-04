@@ -496,3 +496,87 @@ Expressions such as { "$state": "/path" } work in any prop and in action params.
 ${catalogReference()}
 `
 }
+
+/** A complete, valid `create_doc` call; its component runs `issue-stats`. */
+export const exampleDoc = {
+  name: 'weekly-triage',
+  title: 'Weekly triage',
+  body: `## Where we are
+
+Open issues are trending down. Labels with the most open issues get a triage owner this week:
+
+\`\`\`ui
+${JSON.stringify(
+  {
+    root: 'stats',
+    queries: { stats: { script: 'issue-stats' } },
+    elements: {
+      stats: {
+        type: 'Query',
+        props: { query: 'stats' },
+        children: ['chart'],
+      },
+      chart: {
+        type: 'Chart',
+        props: {
+          type: 'bar',
+          data: { $state: '/queries/stats/data/byLabel' },
+          xKey: 'label',
+          series: [{ key: 'open', label: 'Open' }],
+        },
+        children: [],
+      },
+    },
+  } satisfies AppSpec,
+  null,
+  2,
+)}
+\`\`\`
+
+## Owners
+
+- [ ] **bug**: Sam
+- [ ] **docs**: Priya
+`,
+}
+
+/** How to write docs, returned by `get_doc_guide`. */
+export function docGuide(frontendUrl: string) {
+  return `# Writing docs
+
+A doc is a Markdown page, like a Notion page, served at ${frontendUrl}/docs/<name>. People read and edit docs in the browser with a rich-text editor, and you create and change them with create_doc and update_doc. Prose carries the narrative; live components (charts, tables, metrics, forms) are embedded where they belong in it.
+
+## Markdown
+
+The editor understands: headings (#, ##, ###), paragraphs, **bold**, *italic*, ~~strike~~, \`code\`, links, bullet and numbered lists, task lists (- [ ] / - [x]), quotes, fenced code blocks, tables and horizontal rules. Other syntax (HTML, images, footnotes) is not kept when a person edits the doc. The title is shown in the navbar, so don't repeat it as a heading.
+
+## Embedded components
+
+A fenced code block with the language \`ui\` is a live component. Its body is a json-render spec in JSON, the same format as an app's spec (call get_app_guide for the components, expressions, queries and mutations):
+
+\`\`\`\`md
+\`\`\`ui
+{ "root": "…", "elements": { … }, "queries": { … }, "mutations": { … }, "state": { … } }
+\`\`\`
+\`\`\`\`
+
+- Each block is self-contained: its own state, queries and mutations. Blocks that run the same script with the same input share one request.
+- Keep blocks small and focused (a chart, a table, a few Metrics, a short form) and put the explanation in Markdown around them, not in Text elements.
+- A ScrollArea needs a height: docs scroll, so nothing fills the window.
+- Every block is validated like an app spec, including that the scripts it runs exist. Invalid docs are rejected with errors that name the block ("ui block 2: …").
+
+## Workflow
+
+1. Create the scripts the components need (see get_app_guide) and test them with execute_script.
+2. create_doc with the Markdown body. The response has the doc URL.
+3. People may have edited the doc since you last read it, so call get_doc right before update_doc and change that body: update_doc replaces the body as a whole.
+
+## Example
+
+A create_doc call. It assumes a script named issue-stats returning { byLabel: [{ label, open }] }.
+
+\`\`\`\`json
+${JSON.stringify(exampleDoc, null, 2)}
+\`\`\`\`
+`
+}

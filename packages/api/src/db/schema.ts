@@ -42,6 +42,18 @@ export const apps = pgTable('apps', {
 
 export type App = typeof apps.$inferSelect
 
+/** Markdown pages with embedded json-render components, served at `/docs/<name>`. */
+export const docs = pgTable('docs', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  name: text('name').notNull().unique(),
+  title: text('title').notNull(),
+  // Markdown; ```ui code blocks hold component specs.
+  body: text('body').notNull().default(''),
+  ...timestamps,
+})
+
+export type Doc = typeof docs.$inferSelect
+
 /** SVG images, shown in apps by name with the Svg component. */
 export const svgs = pgTable('svgs', {
   id: uuid('id').primaryKey().defaultRandom(),

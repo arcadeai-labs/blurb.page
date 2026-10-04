@@ -1,6 +1,6 @@
 {
-  "id": "806a4755-6de5-4682-892c-a40231d721e9",
-  "prevId": "53c25c27-de76-41a5-8726-963c60e968fe",
+  "id": "7b2c9179-c606-495e-a516-157e263aa80e",
+  "prevId": "806a4755-6de5-4682-892c-a40231d721e9",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
@@ -196,6 +196,64 @@
       "uniqueConstraints": {
         "scripts_name_unique": {
           "name": "scripts_name_unique",
+          "nullsNotDistinct": false,
+          "columns": ["name"]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.svgs": {
+      "name": "svgs",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "markup": {
+          "name": "markup",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "svgs_name_unique": {
+          "name": "svgs_name_unique",
           "nullsNotDistinct": false,
           "columns": ["name"]
         }

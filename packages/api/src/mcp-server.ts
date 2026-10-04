@@ -14,7 +14,14 @@ import {
 } from './apps'
 import { getDb } from './db'
 import { isUniqueViolation } from './db/errors'
-import { apps, type Script, scripts, svgs } from './db/schema'
+import { apps, docs, type Script, scripts, svgs } from './db/schema'
+import {
+  docErrors,
+  docsRunning,
+  docsShowing,
+  toDocJson,
+  toDocSummary,
+} from './docs'
 import { executeScript } from './execute'
 import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
 import type { ScriptError } from './script-error'
@@ -22,7 +29,8 @@ import { scriptFields, scriptName } from './script-fields'
 import { svgFields, svgName } from './svg-fields'
 import { toSvgJson, toSvgSummary } from './svgs'
 import { appFields, appName } from './ui/app'
-import { appGuide } from './ui/guide'
+import { docFields, docName } from './ui/doc'
+import { appGuide, docGuide } from './ui/guide'
 
 function toJson(script: Script) {
   return {
@@ -60,11 +68,19 @@ const scriptNotFound = () => fail('Script not found')
 
 const appNotFound = () => fail('App not found')
 
+const docNotFound = () => fail('Doc not found')
+
 const svgNotFound = () => fail('SVG not found')
 
 function invalidApp(errors: string[]) {
   return fail(
     `The app is invalid. Fix these and retry (see get_app_guide):\n- ${errors.join('\n- ')}`,
+  )
+}
+
+function invalidDoc(errors: string[]) {
+  return fail(
+    `The doc has invalid components. Fix these and retry (see get_doc_guide):\n- ${errors.join('\n- ')}`,
   )
 }
 
@@ -92,7 +108,33 @@ async function uniqueName(kind: string, fn: () => Promise<CallToolResult>) {
   }
 }
 
-/** Adds a note listing apps (e.g. those that run a script), when there are any. */
+/** The apps and docs that run the script called `scriptName`, labelled. */
+async function scriptUsers(scriptName: string) {
+  const [appNames, docNames] = await Promise.all([
+    appsRunning(scriptName),
+    docsRunning(scriptName),
+  ])
+
+  return [
+    ...appNames.map((name) => `app ${name}`),
+    ...docNames.map((name) => `doc ${name}`),
+  ]
+}
+
+/** The apps and docs that show the SVG called `svgName`, labelled. */
+async function svgUsers(svgName: string) {
+  const [appNames, docNames] = await Promise.all([
+    appsShowing(svgName),
+    docsShowing(svgName),
+  ])
+
+  return [
+    ...appNames.map((name) => `app ${name}`),
+    ...docNames.map((name) => `doc ${name}`),
+  ]
+}
+
+/** Adds a note listing apps and docs (e.g. those that run a script), when there are any. */
 function withAppsNote(result: CallToolResult, names: string[], note: string) {
   if (names.length === 0) {
     return result
@@ -111,13 +153,14 @@ const scriptId = z.uuid().describe('Script ID')
 
 const appId = z.uuid().describe('App ID')
 
+const docId = z.uuid().describe('Doc ID')
+
 const svgId = z.uuid().describe('SVG ID')
 
 /** Looks a row up by `id` or `name`, whichever was given. */
-function idOrName<T extends typeof scripts | typeof apps | typeof svgs>(
-  table: T,
-  args: { id?: string; name?: string },
-) {
+function idOrName<
+  T extends typeof scripts | typeof apps | typeof docs | typeof svgs,
+>(table: T, args: { id?: string; name?: string }) {
   if (args.id) {
     return eq(table.id, args.id)
   }
@@ -138,7 +181,9 @@ Before creating or changing an app, call get_app_guide once: it documents the sp
 
 Less is more: build only what the user asked for, with the fewest elements that do it. No headings, intro text or other filler (the navbar already shows the app's title and description), and no features nobody asked for.
 
-Fit the window: the page shouldn't scroll. Put anything that grows with data (tables, lists, message bodies) in a ScrollArea so it scrolls on its own; side-by-side panes each get a ScrollArea that fills the window.`
+Fit the window: the page shouldn't scroll. Put anything that grows with data (tables, lists, message bodies) in a ScrollArea so it scrolls on its own; side-by-side panes each get a ScrollArea that fills the window.
+
+Docs are Notion-like Markdown pages at ${baseUrl}/docs/<name> that people also edit in the browser. They embed live components (the same json-render specs, in \`\`\`ui code blocks) between paragraphs. Call get_doc_guide before create_doc or update_doc.`
 }
 
 /**
@@ -273,8 +318,8 @@ function createMcpServer(baseUrl: string) {
           ? ok(toJson(script))
           : withAppsNote(
               ok(toJson(script)),
-              await appsRunning(previous.name),
-              `Renamed from "${previous.name}"; update these apps, which still run the old name`,
+              await scriptUsers(previous.name),
+              `Renamed from "${previous.name}"; update these apps and docs, which still run the old name`,
             )
       }),
   )
@@ -298,8 +343,8 @@ function createMcpServer(baseUrl: string) {
 
       return withAppsNote(
         ok({ id: script.id }),
-        await appsRunning(script.name),
-        'These apps still run the deleted script',
+        await scriptUsers(script.name),
+        'These apps and docs still run the deleted script',
       )
     },
   )
@@ -457,6 +502,119 @@ function createMcpServer(baseUrl: string) {
   )
 
   server.registerTool(
+    'get_doc_guide',
+    {
+      description:
+        'How to write docs: the Markdown they support, how to embed live components in ```ui blocks, and an example. Read it before create_doc or update_doc.',
+      annotations: { readOnlyHint: true },
+    },
+    () => ({ content: [{ type: 'text', text: docGuide(baseUrl) }] }),
+  )
+
+  server.registerTool(
+    'list_docs',
+    {
+      description: 'List docs with their URLs (without bodies)',
+      annotations: { readOnlyHint: true },
+    },
+    async () => {
+      const rows = await getDb()
+        .select()
+        .from(docs)
+        .orderBy(desc(docs.updatedAt))
+
+      return ok({ docs: rows.map((doc) => toDocSummary(doc, baseUrl)) })
+    },
+  )
+
+  server.registerTool(
+    'get_doc',
+    {
+      description: 'Get a doc, including its Markdown body, by id or name',
+      inputSchema: { id: docId.optional(), name: docName.optional() },
+      annotations: { readOnlyHint: true },
+    },
+    async (args) => {
+      const where = idOrName(docs, args)
+
+      if (!where) {
+        return fail('Pass an id or a name')
+      }
+
+      const [doc] = await getDb().select().from(docs).where(where)
+
+      return doc ? ok(toDocJson(doc, baseUrl)) : docNotFound()
+    },
+  )
+
+  server.registerTool(
+    'create_doc',
+    {
+      description:
+        'Create a doc: a Markdown page whose ```ui blocks are live components. Read get_doc_guide first. Each component is validated like an app spec and the doc is rejected with a list of errors if any is invalid. Returns the doc with its url.',
+      inputSchema: docFields,
+    },
+    async (args) => {
+      const errors = await docErrors(args.body)
+
+      if (errors.length > 0) {
+        return invalidDoc(errors)
+      }
+
+      return uniqueName('A doc', async () => {
+        const [doc] = await getDb().insert(docs).values(args).returning()
+
+        return ok(toDocJson(doc, baseUrl))
+      })
+    },
+  )
+
+  server.registerTool(
+    'update_doc',
+    {
+      description:
+        'Update a doc. Fields left out are kept; body is replaced as a whole, so get_doc first to keep edits people made. Validated like create_doc.',
+      inputSchema: { id: docId, ...z.object(docFields).partial().shape },
+      annotations: { idempotentHint: true },
+    },
+    async ({ id, ...values }) => {
+      const errors =
+        values.body === undefined ? [] : await docErrors(values.body)
+
+      if (errors.length > 0) {
+        return invalidDoc(errors)
+      }
+
+      return uniqueName('A doc', async () => {
+        const [doc] = await getDb()
+          .update(docs)
+          .set(values)
+          .where(eq(docs.id, id))
+          .returning()
+
+        return doc ? ok(toDocJson(doc, baseUrl)) : docNotFound()
+      })
+    },
+  )
+
+  server.registerTool(
+    'delete_doc',
+    {
+      description: 'Delete a doc (the scripts its components run are kept)',
+      inputSchema: { id: docId },
+      annotations: { destructiveHint: true, idempotentHint: true },
+    },
+    async (args) => {
+      const [doc] = await getDb()
+        .delete(docs)
+        .where(eq(docs.id, args.id))
+        .returning({ id: docs.id })
+
+      return doc ? ok({ id: doc.id }) : docNotFound()
+    },
+  )
+
+  server.registerTool(
     'list_svgs',
     {
       description: 'List SVGs (without their markup)',
@@ -535,8 +693,8 @@ function createMcpServer(baseUrl: string) {
           ? ok(toSvgJson(row))
           : withAppsNote(
               ok(toSvgJson(row)),
-              await appsShowing(previous.name),
-              `Renamed from "${previous.name}"; update these apps, which still show the old name`,
+              await svgUsers(previous.name),
+              `Renamed from "${previous.name}"; update these apps and docs, which still show the old name`,
             )
       }),
   )
@@ -560,8 +718,8 @@ function createMcpServer(baseUrl: string) {
 
       return withAppsNote(
         ok({ id: row.id }),
-        await appsShowing(row.name),
-        'These apps still show the deleted SVG',
+        await svgUsers(row.name),
+        'These apps and docs still show the deleted SVG',
       )
     },
   )
