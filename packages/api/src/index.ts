@@ -2,15 +2,17 @@ import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { cors } from 'hono/cors'
 
-import { SignInRequiredError } from './auth'
+import { AccountNotConnectedError, SignInRequiredError } from './auth'
 import {
   type AuthEnv,
   authRoutes,
   requireUser,
   wellKnownRoutes,
 } from './auth/routes'
+import { ArcadeApiError } from './gateways'
 import { handleMcpRequest } from './mcp-server'
 import { meRoutes } from './routes/me'
+import { organizationsRoutes } from './routes/organizations'
 import { scriptsRoutes } from './routes/scripts'
 import { statsRoutes } from './routes/stats'
 import { toolsRoutes } from './routes/tools'
@@ -33,6 +35,7 @@ export const api = new OpenAPIHono<AuthEnv>()
   // Everything below needs a signed-in user.
   .use('*', requireUser)
   .route('/me', meRoutes)
+  .route('/organizations', organizationsRoutes)
   .route('/stats', statsRoutes)
   .route('/scripts', scriptsRoutes)
   .route('/tools', toolsRoutes)
@@ -40,6 +43,16 @@ export const api = new OpenAPIHono<AuthEnv>()
 api.onError((error, c) => {
   if (error instanceof SignInRequiredError) {
     return c.json({ error: error.message }, 401)
+  }
+  if (error instanceof AccountNotConnectedError) {
+    return c.json({ error: error.message }, 403)
+  }
+  if (error instanceof ArcadeApiError) {
+    // Arcade's own 403 and 404 mean the same here; anything else is upstream.
+    return c.json(
+      { error: error.message },
+      error.status === 403 || error.status === 404 ? error.status : 502,
+    )
   }
   throw error
 })

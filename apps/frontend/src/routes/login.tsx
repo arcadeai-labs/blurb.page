@@ -47,7 +47,8 @@ function Login() {
     mutationFn: async () => {
       const { error } = await authClient.signIn.social({
         provider: 'arcade',
-        callbackURL: nextPath(window.location.search),
+        // Links their Arcade account (which lists gateways) on the way.
+        callbackURL: `/connect?next=${encodeURIComponent(nextPath(window.location.search))}`,
         errorCallbackURL: `${window.location.pathname}${window.location.search}`,
       })
 

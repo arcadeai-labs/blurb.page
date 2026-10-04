@@ -21,7 +21,7 @@ const listToolsRoute = createRoute({
   summary: 'List the MCP tools available to scripts',
   responses: {
     200: {
-      description: 'Tools on the MCP server at `MCP_URL`',
+      description: "Tools on the user's MCP gateway",
       content: { 'application/json': { schema: z.array(toolSchema) } },
     },
     503: {
@@ -38,7 +38,7 @@ export const toolsRoutes = new OpenAPIHono<AuthEnv>().openapi(
   async (c) => {
     try {
       const { tools } = await withMcpClient(
-        await c.var.arcadeToken(),
+        await c.var.mcpConnection(),
         (client) => client.listTools(),
       )
 

@@ -1,20 +1,30 @@
 import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 
+import type { McpConnection } from '../mcp'
 import {
-  callbackPath,
+  type ArcadeProvider,
+  callbackPaths,
   clientMetadata,
   clientMetadataPath,
-  loopbackCallbackPath,
+  loopbackCallbackPaths,
   publicOrigin,
 } from './arcade'
-import { arcadeAccessToken, authBasePath, getAuth, getUser } from '.'
+import {
+  arcadeAccessToken,
+  authBasePath,
+  getAuth,
+  getUser,
+  mcpConnection,
+} from '.'
 
 export type AuthEnv = {
   Variables: {
     user: NonNullable<Awaited<ReturnType<typeof getUser>>>
-    /** The user's Arcade access token, for their calls to `MCP_URL`. */
-    arcadeToken: () => Promise<string>
+    /** The user's MCP gateway and Arcade token, for their tool calls. */
+    mcpConnection: () => Promise<McpConnection>
+    /** The user's identity-provider token, for Arcade's APIs. */
+    identityToken: () => Promise<string>
   }
 }
 
@@ -28,7 +38,10 @@ export const requireUser = createMiddleware<AuthEnv>(async (c, next) => {
   }
 
   c.set('user', user)
-  c.set('arcadeToken', () => arcadeAccessToken(auth, user.id))
+  c.set('mcpConnection', () => mcpConnection(auth, user.id))
+  c.set('identityToken', () =>
+    arcadeAccessToken(auth, user.id, 'arcade-identity'),
+  )
   await next()
 })
 
@@ -46,17 +59,31 @@ export const authRoutes = new Hono()
   .get(underApi(clientMetadataPath), (c) =>
     c.json(clientMetadata(publicOrigin(c.req.raw))),
   )
-  // Arcade redirects a portless dev origin's sign-in here, on the loopback
-  // address; the flow's cookies live on the portless origin, so finish there.
-  .get(underApi(loopbackCallbackPath), (c) => {
-    const target = process.env.FRONTEND_URL
+  .get(underApi(loopbackCallbackPaths.arcade), (c) =>
+    finishOnPortless(c.req.url, 'arcade'),
+  )
+  .get(underApi(loopbackCallbackPaths['arcade-identity']), (c) =>
+    finishOnPortless(c.req.url, 'arcade-identity'),
+  )
 
-    if (!target || !new URL(target).hostname.endsWith('.localhost')) {
-      return c.text('Only the portless dev server signs in through here', 400)
-    }
+/**
+ * Arcade redirects a portless dev origin's sign-in to the loopback address;
+ * the flow's cookies live on the portless origin, so it finishes there.
+ */
+function finishOnPortless(url: string, provider: ArcadeProvider) {
+  const target = process.env.FRONTEND_URL
 
-    return c.redirect(`${target}${callbackPath}${new URL(c.req.url).search}`)
-  })
+  if (!target || !new URL(target).hostname.endsWith('.localhost')) {
+    return new Response('Only the portless dev server signs in through here', {
+      status: 400,
+    })
+  }
+
+  return Response.redirect(
+    `${target}${callbackPaths[provider]}${new URL(url).search}`,
+    302,
+  )
+}
 
 /**
  * OAuth discovery for MCP clients (RFC 8414 and RFC 9728), which look for it

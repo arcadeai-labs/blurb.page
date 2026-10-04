@@ -121,7 +121,7 @@ const executeRoute = createRoute({
   path: '/{id}/execute',
   summary: 'Execute a script',
   description:
-    'Runs the script in the `run` QuickJS sandbox with `input` as a global. Every tool on the MCP server at `MCP_URL` is available as `tools.<name>(args)`. Invalid input and script failures are returned as `ok: false`; a tool the user has not authorized yet fails with `AUTHORIZATION_REQUIRED` and an `authorizationUrl`.',
+    'Runs the script in the `run` QuickJS sandbox with `input` as a global. Every tool on the MCP gateway the user picked is available as `tools.<name>(args)`. Invalid input and script failures are returned as `ok: false`; a tool the user has not authorized yet fails with `AUTHORIZATION_REQUIRED` and an `authorizationUrl`.',
   request: {
     params: idParams,
     body: {
@@ -220,7 +220,7 @@ export const scriptsRoutes = new OpenAPIHono<AuthEnv>()
       return c.json(
         await executeScript(
           script,
-          await c.var.arcadeToken(),
+          await c.var.mcpConnection(),
           // Without a body this is `{}`, so the script runs with input `{}`.
           c.req.valid('json').input,
           c.req.raw.signal,

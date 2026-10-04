@@ -7,11 +7,16 @@ import { and, eq } from 'drizzle-orm'
 
 import { getDb } from '../db'
 import * as schema from '../db/schema'
+import { defaultGatewayUrl, userGateway } from '../gateways'
+import type { McpConnection } from '../mcp'
 import {
+  type ArcadeProvider,
   arcadeClientId,
   arcadeMetadata,
   arcadeScopes,
+  arcadeUrls,
   arcadeUser,
+  identityClient,
   publicOrigin,
   redirectUri,
 } from './arcade'
@@ -58,6 +63,7 @@ async function createAuth(origin: string) {
     arcadeClientId(origin),
     arcadeMetadata(),
   ])
+  const identity = identityClient()
 
   return betterAuth({
     baseURL: origin,
@@ -65,7 +71,14 @@ async function createAuth(origin: string) {
     database: drizzleAdapter(getDb(), { provider: 'pg', schema }),
     // The JWT plugin's own `/token` would clash with the OAuth token endpoint.
     disabledPaths: ['/token'],
-    account: { encryptOAuthTokens: true },
+    account: {
+      encryptOAuthTokens: true,
+      // Both providers are the same Arcade account, so they link to one user.
+      accountLinking: {
+        enabled: true,
+        trustedProviders: ['arcade', 'arcade-identity'],
+      },
+    },
     hooks: { before: nativeClientRegistration },
     plugins: [
       genericOAuth({
@@ -78,11 +91,26 @@ async function createAuth(origin: string) {
             authorizationUrl: metadata.authorization_endpoint,
             tokenUrl: metadata.token_endpoint,
             scopes: arcadeScopes,
-            redirectURI: redirectUri(origin),
+            redirectURI: redirectUri(origin, 'arcade'),
             getUserInfo: async (tokens) =>
               tokens.accessToken ? arcadeUser(tokens.accessToken) : null,
             overrideUserInfo: true,
           },
+          ...(identity
+            ? [
+                {
+                  providerId: 'arcade-identity',
+                  name: 'Arcade account',
+                  ...identity,
+                  tokenEndpointAuth: { method: 'client_secret_post' as const },
+                  discoveryUrl: `${arcadeUrls.identity}/.well-known/openid-configuration`,
+                  scopes: ['openid', 'email', 'profile', 'offline_access'],
+                  redirectURI: redirectUri(origin, 'arcade-identity'),
+                  // Only linked to users who signed in with `arcade`.
+                  disableSignUp: true,
+                },
+              ]
+            : []),
         ],
       }),
       jwt(),
@@ -143,20 +171,46 @@ export class SignInRequiredError extends Error {
   name = 'SignInRequiredError'
 }
 
-/** The user's Arcade access token, refreshed when it has expired. */
-export async function arcadeAccessToken(auth: Auth, userId: string) {
+/** The user hasn't linked their Arcade account (`arcade-identity`) yet. */
+export class AccountNotConnectedError extends Error {
+  name = 'AccountNotConnectedError'
+}
+
+/** The user's account with `provider`, if they have one. */
+export async function findAccount(userId: string, provider: ArcadeProvider) {
   const [account] = await getDb()
     .select({ id: schema.account.id })
     .from(schema.account)
     .where(
       and(
         eq(schema.account.userId, userId),
-        eq(schema.account.providerId, 'arcade'),
+        eq(schema.account.providerId, provider),
       ),
     )
 
+  return account ?? null
+}
+
+/**
+ * The user's access token from `provider`, refreshed when it has expired. A
+ * missing or unrenewable `arcade` token means signing in again; a missing
+ * `arcade-identity` one, connecting the account.
+ */
+export async function arcadeAccessToken(
+  auth: Auth,
+  userId: string,
+  provider: ArcadeProvider = 'arcade',
+) {
+  const missing =
+    provider === 'arcade'
+      ? new SignInRequiredError('Sign in with Arcade first.')
+      : new AccountNotConnectedError(
+          'Connect your Arcade account to list your gateways.',
+        )
+  const account = await findAccount(userId, provider)
+
   if (!account) {
-    throw new SignInRequiredError('Sign in with Arcade first.')
+    throw missing
   }
 
   try {
@@ -168,13 +222,31 @@ export async function arcadeAccessToken(auth: Auth, userId: string) {
       return accessToken
     }
   } catch (error) {
-    throw new SignInRequiredError(
-      'Your Arcade session has expired. Sign in again.',
-      { cause: error },
-    )
+    throw provider === 'arcade'
+      ? new SignInRequiredError(
+          'Your Arcade session has expired. Sign in again.',
+          { cause: error },
+        )
+      : new AccountNotConnectedError(
+          'Your Arcade account session has expired. Connect it again.',
+          { cause: error },
+        )
   }
 
-  throw new SignInRequiredError('Sign in with Arcade first.')
+  throw missing
+}
+
+/** The user's MCP gateway and their Arcade token, for their tool calls. */
+export async function mcpConnection(
+  auth: Auth,
+  userId: string,
+): Promise<McpConnection> {
+  const [gateway, accessToken] = await Promise.all([
+    userGateway(userId),
+    arcadeAccessToken(auth, userId),
+  ])
+
+  return { url: gateway?.url ?? defaultGatewayUrl(), accessToken }
 }
 
 /**

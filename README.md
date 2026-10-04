@@ -34,9 +34,11 @@ in a Docker container. On Vercel, set the project's root directory to
 `apps/frontend`; Nitro detects Vercel at build time and emits a Node function
 instead.
 
-Configure `DATABASE_URL`, `MCP_URL` and `BETTER_AUTH_SECRET` (for example
-`openssl rand -base64 32`) in the environment, and run `pnpm db:migrate` against the database before
-deploying a schema change. App URLs use the request's origin; set
+Configure `DATABASE_URL`, `BETTER_AUTH_SECRET` (for example
+`openssl rand -base64 32`) and, to let users pick their gateway,
+`ARCADE_IDENTITY_CLIENT_ID` / `ARCADE_IDENTITY_CLIENT_SECRET` (see
+[Auth](#auth)) in the environment, and run `pnpm db:migrate` against the
+database before deploying a schema change. App URLs use the request's origin; set
 `FRONTEND_URL` when that differs from the public URL (for example behind a
 proxy that terminates TLS).
 
@@ -54,8 +56,7 @@ that deployment. To set it up:
 2. Turn on **Automatically delete obsolete Neon branches**, so a preview branch
    is removed after its Git branch is deleted. The integration also points
    Production and Development's `DATABASE_URL` at the default branch.
-3. Set `MCP_URL` and `BETTER_AUTH_SECRET` for the Preview environment in
-   Vercel too. Arcade fetches each deployment's `/api/arcade/client.json` to
+3. Set `BETTER_AUTH_SECRET` for the Preview environment in Vercel too. Arcade fetches each deployment's `/api/arcade/client.json` to
    sign users in, so Vercel's Deployment Protection has to let that path
    through (or be off for previews).
 
@@ -67,8 +68,8 @@ with a preview database: the integration matches Neon branches by name.
 ## Scripts
 
 `/api/scripts` is CRUD for saved scripts, and `POST /api/scripts/:id/execute`
-runs one in the `run` QuickJS sandbox. Every tool on the MCP server at
-`MCP_URL` is exposed to scripts as `tools.<functionName>(args)`. Names are made
+runs one in the `run` QuickJS sandbox. Every tool on the user's MCP gateway
+is exposed to scripts as `tools.<functionName>(args)`. Names are made
 into valid identifiers, so `Gmail.ListEmails` becomes `tools.Gmail_ListEmails`.
 `GET /api/tools` lists them.
 
@@ -91,13 +92,37 @@ and `.env`.
 ## Auth
 
 Anyone with an Arcade account signs in with it, the way MCP clients sign in to
-Arcade's gateways. every-ui is a client of Arcade's OAuth server
-(`https://cloud.arcade.dev/oauth2`, or `ARCADE_OAUTH_ISSUER`), and the access
-token it gets back both identifies the user (its `sub` and `email`) and
-authorizes their calls to `MCP_URL`. Point `MCP_URL` at an Arcade gateway that
-uses Arcade auth, such as `https://api.arcade.dev/mcp/arcade`, which runs tools
-in the user's own default project, with their own connections. Nothing has to
-be set up on Arcade's side.
+Arcade's gateways, and their tool calls run as them, on an MCP gateway they
+pick. every-ui signs users in with two of Arcade's authorization servers,
+linked to one user:
+
+- **`arcade`**, the OAuth server MCP clients use (`$ARCADE_CLOUD_URL/oauth2`).
+  Every Arcade account can authorize clients on it, so this is the sign-in.
+  Its access token identifies the user (its `sub` and `email`) and calls their
+  MCP gateway. Nothing has to be set up on Arcade's side.
+- **`arcade-identity`**, Arcade's identity provider (`$ARCADE_IDENTITY_URL`),
+  which the dashboard signs in with. It's linked right after sign-in (the same
+  Arcade login, so it passes straight through) and reads the user's
+  organizations, projects and gateways from Arcade's APIs, which don't take
+  MCP tokens. It needs an OAuth2 client in Arcade's Ory project:
+  `ARCADE_IDENTITY_CLIENT_ID` and `ARCADE_IDENTITY_CLIENT_SECRET`, with
+  `client_secret_post`, JWT access tokens and these redirect URIs:
+  `<origin>/api/auth/callback/arcade-identity` for each deployed origin, and
+  `http://127.0.0.1:5173/api/auth/callback/arcade-identity` and
+  `http://127.0.0.1:5173/api/arcade/identity-callback` for the dev server.
+  Without it, everyone uses the default gateway.
+
+Users pick a gateway at `/gateway`: any gateway in their projects that signs
+users in with Arcade (gateways that take an API key can't run tools as them).
+Their choice is kept in `user_gateways`; until they pick one, tool calls go to
+`MCP_URL`, or else Arcade's global gateway (`$ARCADE_API_URL/mcp/arcade`),
+which runs tools in their default project.
+
+Arcade's URLs default to production. `ARCADE_CLOUD_URL`, `ARCADE_API_URL` and
+`ARCADE_IDENTITY_URL` point every-ui at another stack, for example staging
+(`https://cloud.bosslevel.dev`, `https://api.bosslevel.dev` and
+`https://auth.bosslevel.dev`); set all three together, since accounts don't
+carry over between stacks.
 
 [Better Auth](https://www.better-auth.com) (`packages/api/src/auth`, mounted at
 `/api/auth`) keeps users, sessions and the encrypted Arcade tokens in Postgres,
@@ -109,8 +134,8 @@ itself, needs a signed-in user, and so does `/mcp`:
   server for its own `/mcp` (Better Auth's MCP plugin), so a client registers
   itself, sends the user to `/login` and `/consent`, and then acts as them.
 
-Arcade identifies every-ui by a client ID per origin. On a public origin it's
-the URL of a client metadata document every-ui serves
+Arcade's MCP OAuth server identifies every-ui by a client ID per origin. On a
+public origin it's the URL of a client metadata document every-ui serves
 (`/api/arcade/client.json`), which Arcade fetches. Arcade can't fetch a local
 one, so the dev server registers a client instead and keeps it in the
 `arcade_clients` table. Arcade only redirects over http to bare loopback hosts,

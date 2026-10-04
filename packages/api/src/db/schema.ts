@@ -1,7 +1,15 @@
 // Drizzle table definitions. Run `pnpm db:generate` after changing this file.
-import { jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core'
+import {
+  jsonb,
+  pgTable,
+  primaryKey,
+  text,
+  timestamp,
+  uuid,
+} from 'drizzle-orm/pg-core'
 
 import type { ActionBinding, AppSpec } from '../ui/app'
+import { user } from './auth-schema'
 
 const timestamps = {
   createdAt: timestamp('created_at', { withTimezone: true })
@@ -58,10 +66,34 @@ export type Doc = typeof docs.$inferSelect
  * Clients registered with Arcade's OAuth server for local origins, which
  * can't serve a client metadata document Arcade can fetch (see `auth/arcade`).
  */
-export const arcadeClients = pgTable('arcade_clients', {
-  origin: text('origin').primaryKey(),
-  clientId: text('client_id').notNull(),
+export const arcadeClients = pgTable(
+  'arcade_clients',
+  {
+    // The OAuth server it's registered with: Arcade stacks don't share them.
+    issuer: text('issuer').notNull(),
+    origin: text('origin').notNull(),
+    clientId: text('client_id').notNull(),
+    ...timestamps,
+  },
+  (table) => [primaryKey({ columns: [table.issuer, table.origin] })],
+)
+
+/**
+ * The MCP gateway each user picked, which their tool calls go to. Users
+ * without one use the default gateway (`MCP_URL`).
+ */
+export const userGateways = pgTable('user_gateways', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  organizationId: text('organization_id').notNull(),
+  projectId: text('project_id').notNull(),
+  gatewayId: text('gateway_id').notNull(),
+  name: text('name').notNull(),
+  url: text('url').notNull(),
   ...timestamps,
 })
+
+export type UserGateway = typeof userGateways.$inferSelect
 
 export * from './auth-schema'

@@ -1,6 +1,19 @@
 CREATE TABLE "arcade_clients" (
-	"origin" text PRIMARY KEY NOT NULL,
+	"issuer" text NOT NULL,
+	"origin" text NOT NULL,
 	"client_id" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "arcade_clients_issuer_origin_pk" PRIMARY KEY("issuer","origin")
+);
+--> statement-breakpoint
+CREATE TABLE "user_gateways" (
+	"user_id" text PRIMARY KEY NOT NULL,
+	"organization_id" text NOT NULL,
+	"project_id" text NOT NULL,
+	"gateway_id" text NOT NULL,
+	"name" text NOT NULL,
+	"url" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
@@ -188,6 +201,7 @@ CREATE TABLE "verification" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "user_gateways" ADD CONSTRAINT "user_gateways_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "account" ADD CONSTRAINT "account_user_id_user_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."user"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "oauth_access_token" ADD CONSTRAINT "oauth_access_token_client_id_oauth_client_client_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."oauth_client"("client_id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "oauth_access_token" ADD CONSTRAINT "oauth_access_token_session_id_session_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."session"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint

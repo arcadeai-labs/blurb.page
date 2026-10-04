@@ -1,29 +1,71 @@
-// Sign-in with Arcade. Every Arcade account can authorize clients on Arcade's
-// OAuth server (the one MCP clients use for Arcade's gateways), so every-ui is
-// one of its clients: the access token it gets back both identifies the user
-// and authenticates their tool calls on the MCP gateway at `MCP_URL`.
-import { eq } from 'drizzle-orm'
+// Sign-in with Arcade, through two of its authorization servers:
+// - `arcade`: the OAuth server MCP clients use for Arcade's gateways, which
+//   every Arcade account can authorize clients on. Its token identifies the
+//   user and authenticates their tool calls on their MCP gateway.
+// - `arcade-identity`: Arcade's identity provider (the dashboard's sign-in),
+//   linked to the same user. Its token reads the user's organizations,
+//   projects and gateways from Arcade's APIs, which don't take MCP tokens.
+import { and, eq } from 'drizzle-orm'
 import { createRemoteJWKSet, jwtVerify } from 'jose'
 import { z } from 'zod'
 
 import { getDb } from '../db'
 import { arcadeClients } from '../db/schema'
 
-/** Arcade's OAuth server. Override it to sign in against another Arcade stack. */
-const issuer =
-  process.env.ARCADE_OAUTH_ISSUER ?? 'https://cloud.arcade.dev/oauth2'
+/** A base URL from the environment, without a trailing slash. */
+function baseUrl(name: string, fallback: string) {
+  return (process.env[name] ?? fallback).replace(/\/$/, '')
+}
+
+/**
+ * Arcade's services, production by default. Point all three at another stack
+ * together (staging: `https://cloud.bosslevel.dev`, `https://api.bosslevel.dev`
+ * and `https://auth.bosslevel.dev`), since accounts don't carry over.
+ */
+export const arcadeUrls = {
+  /** The control plane (organizations and projects), and the MCP OAuth server. */
+  cloud: baseUrl('ARCADE_CLOUD_URL', 'https://cloud.arcade.dev'),
+  /** The engine: its API, and gateways at `/mcp/<slug>`. */
+  api: baseUrl('ARCADE_API_URL', 'https://api.arcade.dev'),
+  /** The identity provider (Ory) the dashboard signs in with. */
+  identity: baseUrl('ARCADE_IDENTITY_URL', 'https://auth.arcade.dev'),
+}
+
+/** Arcade's OAuth server for MCP clients. */
+const issuer = `${arcadeUrls.cloud}/oauth2`
 
 /** `mcp` lets the token call MCP gateways; `offline_access` adds a refresh token. */
 export const arcadeScopes = ['mcp', 'offline_access']
 
-/** Where Better Auth receives Arcade's redirect (its social sign-in callback). */
-export const callbackPath = '/api/auth/callback/arcade'
+/** Better Auth's provider IDs for the two servers. */
+export type ArcadeProvider = 'arcade' | 'arcade-identity'
+
+/** Where Better Auth receives each server's redirect (its social callback). */
+export const callbackPaths: Record<ArcadeProvider, string> = {
+  arcade: '/api/auth/callback/arcade',
+  'arcade-identity': '/api/auth/callback/arcade-identity',
+}
+
+/** Forward a loopback redirect to the dev server's portless origin. */
+export const loopbackCallbackPaths: Record<ArcadeProvider, string> = {
+  arcade: '/api/arcade/callback',
+  'arcade-identity': '/api/arcade/identity-callback',
+}
 
 /** Serves the client metadata document an origin's client ID points at. */
 export const clientMetadataPath = '/api/arcade/client.json'
 
-/** Forwards a loopback redirect to the dev server's portless origin. */
-export const loopbackCallbackPath = '/api/arcade/callback'
+/**
+ * The identity provider's client, registered with Arcade (an OAuth2 client in
+ * its Ory project, with these redirect URIs). Without one, users can't list
+ * gateways, and everyone uses the default gateway.
+ */
+export function identityClient() {
+  const clientId = process.env.ARCADE_IDENTITY_CLIENT_ID
+  const clientSecret = process.env.ARCADE_IDENTITY_CLIENT_SECRET
+
+  return clientId && clientSecret ? { clientId, clientSecret } : null
+}
 
 const metadataSchema = z.object({
   issuer: z.string(),
@@ -111,16 +153,16 @@ export function publicOrigin(request: Request) {
 /**
  * Arcade only redirects over http to bare loopback hosts, so a portless
  * `https://*.localhost` origin is sent back through this server's loopback
- * address, which forwards to it (see {@link loopbackCallbackPath}).
+ * address, which forwards to it (see {@link loopbackCallbackPaths}).
  */
-export function redirectUri(origin: string) {
+export function redirectUri(origin: string, provider: ArcadeProvider) {
   const { hostname } = new URL(origin)
 
   if (isLocal(hostname) && !isLoopback(hostname)) {
-    return `http://127.0.0.1:${process.env.PORT ?? 5173}${loopbackCallbackPath}`
+    return `http://127.0.0.1:${process.env.PORT ?? 5173}${loopbackCallbackPaths[provider]}`
   }
 
-  return `${origin}${callbackPath}`
+  return `${origin}${callbackPaths[provider]}`
 }
 
 /** The client metadata document an origin's client ID points at. */
@@ -129,7 +171,7 @@ export function clientMetadata(origin: string) {
     client_id: `${origin}${clientMetadataPath}`,
     client_name: 'every-ui',
     client_uri: origin,
-    redirect_uris: [redirectUri(origin)],
+    redirect_uris: [redirectUri(origin, 'arcade')],
     grant_types: ['authorization_code', 'refresh_token'],
     response_types: ['code'],
     token_endpoint_auth_method: 'none',
@@ -187,7 +229,9 @@ export async function arcadeClientId(origin: string) {
   const [existing] = await db
     .select()
     .from(arcadeClients)
-    .where(eq(arcadeClients.origin, origin))
+    .where(
+      and(eq(arcadeClients.issuer, issuer), eq(arcadeClients.origin, origin)),
+    )
 
   if (
     existing &&
@@ -200,9 +244,9 @@ export async function arcadeClientId(origin: string) {
 
   await db
     .insert(arcadeClients)
-    .values({ origin, clientId })
+    .values({ issuer, origin, clientId })
     .onConflictDoUpdate({
-      target: arcadeClients.origin,
+      target: [arcadeClients.issuer, arcadeClients.origin],
       set: { clientId, updatedAt: new Date() },
     })
 

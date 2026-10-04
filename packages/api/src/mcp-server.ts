@@ -11,13 +11,18 @@ import {
   toAppJson,
   toAppSummary,
 } from './apps'
-import { arcadeAccessToken, SignInRequiredError, withMcpUser } from './auth'
+import { mcpConnection, SignInRequiredError, withMcpUser } from './auth'
 import { getDb } from './db'
 import { isUniqueViolation } from './db/errors'
 import { apps, docs, type Script, scripts } from './db/schema'
 import { docErrors, docsRunning, toDocJson, toDocSummary } from './docs'
 import { executeScript } from './execute'
-import { McpUnavailableError, toFunctionName, withMcpClient } from './mcp'
+import {
+  type McpConnection,
+  McpUnavailableError,
+  toFunctionName,
+  withMcpClient,
+} from './mcp'
 import type { ScriptError } from './script-error'
 import { scriptFields, scriptName } from './script-fields'
 import { appFields, appName } from './ui/app'
@@ -169,9 +174,12 @@ Docs are Notion-like Markdown pages at ${baseUrl}/docs/<name> that people also e
 
 /**
  * The API's operations, exposed as MCP tools. `baseUrl` is where apps are
- * rendered, and `arcadeToken` gets the user's token for the upstream server.
+ * rendered, and `connection` gets the user's MCP gateway and token.
  */
-function createMcpServer(baseUrl: string, arcadeToken: () => Promise<string>) {
+function createMcpServer(
+  baseUrl: string,
+  connection: () => Promise<McpConnection>,
+) {
   const server = new McpServer(
     { name: 'every-ui', version: '0.0.0' },
     { instructions: instructions(baseUrl) },
@@ -205,12 +213,12 @@ function createMcpServer(baseUrl: string, arcadeToken: () => Promise<string>) {
     'list_script_tools',
     {
       description:
-        'List the tools on the upstream MCP server (`MCP_URL`) that scripts can call as `tools.<functionName>(args)`',
+        "List the tools on the user's MCP gateway that scripts can call as `tools.<functionName>(args)`",
       annotations: { readOnlyHint: true },
     },
     () =>
       upstream(async () => {
-        const { tools } = await withMcpClient(await arcadeToken(), (client) =>
+        const { tools } = await withMcpClient(await connection(), (client) =>
           client.listTools(),
         )
 
@@ -336,7 +344,7 @@ function createMcpServer(baseUrl: string, arcadeToken: () => Promise<string>) {
     'execute_script',
     {
       description:
-        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the upstream MCP server (`MCP_URL`) is available to it as `tools.<functionName>(args)`. Returns `{ value }`. If a tool needs the user to authorize it first, it fails with AUTHORIZATION_REQUIRED and a link to show the user.',
+        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the MCP gateway the user picked is available to it as `tools.<functionName>(args)`. Returns `{ value }`. If a tool needs the user to authorize it first, it fails with AUTHORIZATION_REQUIRED and a link to show the user.',
       inputSchema: {
         id: scriptId.optional(),
         name: scriptName.optional(),
@@ -363,7 +371,7 @@ function createMcpServer(baseUrl: string, arcadeToken: () => Promise<string>) {
       return upstream(async () => {
         const result = await executeScript(
           script,
-          await arcadeToken(),
+          await connection(),
           args.input,
           extra.signal,
         )
@@ -619,7 +627,7 @@ export async function handleMcpRequest(request: Request) {
 
   return withMcpUser(request, async (auth, userId) => {
     const server = createMcpServer(frontendUrl(request), () =>
-      arcadeAccessToken(auth, userId),
+      mcpConnection(auth, userId),
     )
     const transport = new WebStandardStreamableHTTPServerTransport({
       sessionIdGenerator: undefined,

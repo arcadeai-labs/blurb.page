@@ -52,6 +52,9 @@ function UserMenu() {
           <DropdownMenuLabel>Signed in with Arcade</DropdownMenuLabel>
         </DropdownMenuGroup>
         <DropdownMenuSeparator />
+        <DropdownMenuItem onClick={() => navigate({ to: '/gateway' })}>
+          Gateway: {me.data.gateway?.name ?? 'Default'}
+        </DropdownMenuItem>
         <DropdownMenuItem
           disabled={signOut.isPending}
           onClick={() => signOut.mutate()}
