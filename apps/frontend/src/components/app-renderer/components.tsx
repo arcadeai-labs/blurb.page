@@ -393,7 +393,7 @@ const minFillHeight = 240
  * window, less the bottom padding and borders of what contains it (its Card,
  * the page). Re-measured whenever the page's layout or the window changes.
  */
-function useFillHeight(enabled: boolean) {
+export function useFillHeight(enabled: boolean) {
   const ref = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState<number>()
 

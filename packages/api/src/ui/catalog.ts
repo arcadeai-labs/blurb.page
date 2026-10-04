@@ -153,7 +153,7 @@ export const customComponentDefinitions = {
     props: z.object({}),
     slots: ['default'],
     description:
-      'A slideshow: shows one child at a time on a 16:9 canvas, with previous/next buttons, a slide counter, arrow-key navigation and a full-screen button for presenting. Each child is one slide, normally a Slide. Make it the root element of a presentation. With "repeat" over an array and a single Slide child, it shows one slide per item.',
+      'A slideshow: shows one child at a time on a 16:9 canvas, with previous/next buttons, a slide counter, arrow-key navigation and a full-screen button for presenting. Each child is one slide, normally a Slide. Make it the root element of a presentation. Slides never scroll: the deck fits the window and the content of each slide is shrunk to fit it, so never put a ScrollArea in a deck. With "repeat" over an array and a single Slide child, it shows one slide per item.',
     example: {},
   },
   Slide: {
@@ -163,7 +163,7 @@ export const customComponentDefinitions = {
     }),
     slots: ['default'],
     description:
-      'One slide of a Slides deck. layout: "title" (large centered title with children such as a subtitle below, for the opening slide), "section" (centered title introducing a part of the talk), "content" (the default: title at the top, children stacked below) or "two-column" (title at the top, children side by side, e.g. a Markdown beside a Chart). Use Markdown for text; Chart, Metric, DataTable and Query work as anywhere else. Keep each slide sparse: a few bullets or one chart.',
+      'One slide of a Slides deck. layout: "title" (large centered title with children such as a subtitle below, for the opening slide), "section" (centered title introducing a part of the talk), "content" (the default: title at the top, children stacked below) or "two-column" (title at the top, children side by side, e.g. a Markdown beside a Chart). Use Markdown for text; Chart, Metric, DataTable and Query work as anywhere else. Keep each slide sparse (a few bullets or one chart): content that does not fit is shrunk until it does, so split long content across slides.',
     example: { title: 'Q3 results', layout: 'content' },
   },
 }

@@ -346,7 +346,7 @@ Build exactly what the user asked for, with the fewest elements that do it well.
 
 ## Fit the window
 
-An app should fit in the browser window like a desktop app: the page itself shouldn't scroll, its long parts should. Anything that grows with data (tables, lists, repeated items, message or document bodies, logs, JsonView) goes in a ScrollArea, which scrolls on its own instead of stretching the page.
+An app should fit in the browser window like a desktop app: the page itself shouldn't scroll, its long parts should. Anything that grows with data (tables, lists, repeated items, message or document bodies, logs, JsonView) goes in a ScrollArea, which scrolls on its own instead of stretching the page. Slideshows are the exception: slides never scroll (see Slideshows).
 
 - Wrap only the long part, inside its Card and Query: keep a Card's title, toolbar and buttons outside the ScrollArea so they stay put.
 - Side-by-side panes (list and detail, inbox and message): a Grid of panes, each with a ScrollArea without a height. Both fill the window down to the bottom and scroll independently.
@@ -458,6 +458,7 @@ A presentation is an app whose root is a Slides element with one Slide child per
 - Write text with Markdown: a few short bullets per slide, not paragraphs. Each Slide has a title and a layout ("title", "section", "content" or "two-column").
 - Slides can show live data: wrap a Chart, Metric or DataTable in a Query, or put values in Markdown with $template, exactly as in any other app.
 - One slide per row of data: "repeat" on the Slides element with a single Slide child that reads { "$item": "field" }.
+- Slides never scroll, like slides in a presentation: the deck fits the window, and a slide whose content doesn't fit is shrunk until it does. No ScrollArea in a deck; split long content (a long list, a table with many rows) across slides, e.g. a few rows per slide.
 
 \`\`\`json
 ${JSON.stringify(exampleSlides, null, 2)}

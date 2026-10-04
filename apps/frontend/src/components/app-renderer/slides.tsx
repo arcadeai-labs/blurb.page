@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import {
   type KeyboardEvent,
+  type ReactNode,
   type RefObject,
   useEffect,
   useLayoutEffect,
@@ -15,12 +16,16 @@ import {
 } from 'react'
 import { Button } from '@/components/ui/button'
 import { toast } from '@/components/ui/toast'
-import type { PropsOf } from './components'
+import { type PropsOf, useFillHeight } from './components'
 
 // Slides are laid out on a fixed canvas and scaled to fit, so they look the
-// same inline and full screen.
+// same inline and full screen. Like slides in a presentation app, they never
+// scroll: the deck fits the window, and a slide's content fits the slide.
 const canvasWidth = 960
 const canvasHeight = 540
+
+/** Height of the controls under the slide, and the gap above them. */
+const controlsHeight = 36
 
 /** How much to scale the canvas to fit inside `frame`. */
 function useFitScale(frame: RefObject<HTMLDivElement | null>) {
@@ -86,7 +91,8 @@ function usesArrowKeys(element: EventTarget) {
 }
 
 export function Slides({ children }: PropsOf<'Slides'>) {
-  const deck = useRef<HTMLDivElement>(null)
+  // The deck runs to the bottom of the window; the slide is as wide as fits.
+  const { ref: deck, height } = useFillHeight(true)
   const frame = useRef<HTMLDivElement>(null)
   const canvas = useRef<HTMLDivElement>(null)
   const scale = useFitScale(frame)
@@ -164,8 +170,15 @@ export function Slides({ children }: PropsOf<'Slides'>) {
         ref={frame}
         className={cn(
           'relative overflow-hidden',
-          fullscreen ? 'flex-1' : 'aspect-video rounded-xl border border-line',
+          fullscreen
+            ? 'flex-1'
+            : 'mx-auto aspect-video w-full rounded-xl border border-line',
         )}
+        style={
+          fullscreen || height === undefined
+            ? undefined
+            : { maxWidth: ((height - controlsHeight) * 16) / 9 }
+        }
       >
         <div
           ref={canvas}
@@ -214,23 +227,83 @@ export function Slides({ children }: PropsOf<'Slides'>) {
   )
 }
 
+/**
+ * Fills the space left in its flex column and shrinks its children (never
+ * grows them) until they fit, so a slide with too much on it never overflows.
+ */
+function ShrinkToFit({
+  className,
+  origin,
+  children,
+}: {
+  className: string
+  origin: string
+  children: ReactNode
+}) {
+  const box = useRef<HTMLDivElement>(null)
+  const content = useRef<HTMLDivElement>(null)
+  const [scale, setScale] = useState(1)
+
+  useLayoutEffect(() => {
+    const boxElement = box.current
+    const contentElement = content.current
+    if (!boxElement || !contentElement) return
+
+    // Layout sizes ignore transforms, so scaling doesn't change what's measured.
+    function measure(boxElement: HTMLElement, contentElement: HTMLElement) {
+      const available = boxElement.clientHeight
+      const needed = contentElement.offsetHeight
+
+      setScale(needed > available ? available / needed : 1)
+    }
+
+    const observer = new ResizeObserver(() =>
+      measure(boxElement, contentElement),
+    )
+    observer.observe(boxElement)
+    observer.observe(contentElement)
+    return () => observer.disconnect()
+  }, [])
+
+  return (
+    <div ref={box} className="min-h-0 flex-1 overflow-hidden">
+      <div
+        ref={content}
+        className={className}
+        style={
+          scale < 1
+            ? { transform: `scale(${scale})`, transformOrigin: origin }
+            : undefined
+        }
+      >
+        {children}
+      </div>
+    </div>
+  )
+}
+
 export function Slide({ props, children }: PropsOf<'Slide'>) {
   const layout = props.layout ?? 'content'
 
   if (layout === 'title' || layout === 'section') {
     return (
-      <div className="flex size-full flex-col items-center justify-center gap-6 p-16 text-center text-2xl">
-        {props.title ? (
-          <h2
-            className={cn(
-              'font-semibold tracking-tight text-balance',
-              layout === 'title' ? 'text-6xl' : 'text-5xl',
-            )}
-          >
-            {props.title}
-          </h2>
-        ) : null}
-        <div className="text-muted-foreground">{children}</div>
+      <div className="flex size-full flex-col p-16 text-2xl">
+        <ShrinkToFit
+          className="flex min-h-full flex-col items-center justify-center gap-6 text-center"
+          origin="top center"
+        >
+          {props.title ? (
+            <h2
+              className={cn(
+                'font-semibold tracking-tight text-balance',
+                layout === 'title' ? 'text-6xl' : 'text-5xl',
+              )}
+            >
+              {props.title}
+            </h2>
+          ) : null}
+          <div className="text-muted-foreground">{children}</div>
+        </ShrinkToFit>
       </div>
     )
   }
@@ -240,16 +313,16 @@ export function Slide({ props, children }: PropsOf<'Slide'>) {
       {props.title ? (
         <h2 className="text-4xl font-semibold tracking-tight">{props.title}</h2>
       ) : null}
-      <div
-        className={cn(
-          'min-h-0 flex-1',
+      <ShrinkToFit
+        className={
           layout === 'two-column'
             ? 'grid grid-cols-2 items-start gap-10'
-            : 'flex flex-col gap-6',
-        )}
+            : 'flex flex-col gap-6'
+        }
+        origin="top left"
       >
         {children}
-      </div>
+      </ShrinkToFit>
     </div>
   )
 }
