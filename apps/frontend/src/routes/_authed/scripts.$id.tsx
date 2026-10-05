@@ -1,10 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
+import { ToolkitTools } from '@/components/app-toolkits'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { scriptQuery } from '@/lib/api'
+import { scriptQuery, scriptToolkitsQuery } from '@/lib/api'
 
 export const Route = createFileRoute('/_authed/scripts/$id')({
   component: ScriptPage,
@@ -15,6 +17,45 @@ function Code({ children }: Readonly<{ children: string }>) {
     <pre className="overflow-x-auto rounded-lg bg-muted p-4 font-mono text-sm">
       <code>{children}</code>
     </pre>
+  )
+}
+
+/**
+ * The toolkits and MCP servers on the user's gateway the script calls tools
+ * from, with those tools.
+ */
+function ScriptToolkits({ id }: Readonly<{ id: string }>) {
+  const toolkits = useQuery(scriptToolkitsQuery)
+
+  if (toolkits.isPending) {
+    return <Skeleton className="h-24" />
+  }
+
+  if (toolkits.isError) {
+    return (
+      <Alert variant="destructive">
+        <AlertTitle>Could not load the script's tools</AlertTitle>
+        <AlertDescription>{toolkits.error.message}</AlertDescription>
+      </Alert>
+    )
+  }
+
+  const used = toolkits.data.find((script) => script.id === id)?.toolkits ?? []
+
+  if (used.length === 0) {
+    return <p className="text-sm text-muted-foreground">Calls no tools</p>
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {used.map((toolkit) => (
+        <Card key={toolkit.name}>
+          <CardContent>
+            <ToolkitTools toolkit={toolkit} />
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   )
 }
 
@@ -45,6 +86,10 @@ function ScriptPage() {
 
   return (
     <Page title={name} description={description}>
+      <section className="grid gap-3">
+        <h2 className="text-sm font-medium">Tools</h2>
+        <ScriptToolkits id={id} />
+      </section>
       <Tabs defaultValue="source">
         <TabsList>
           <TabsTrigger value="source">Source</TabsTrigger>

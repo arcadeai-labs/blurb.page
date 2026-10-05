@@ -22,13 +22,13 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/components/ui/toast'
 import {
-  appToolkitsQuery,
   clearGateway,
   gatewaysQuery,
   meQuery,
   organizationsQuery,
   projectsQuery,
   setGateway,
+  toolkitsQueryKey,
 } from '@/lib/api'
 import { connectArcadeAccount } from '@/lib/auth-client'
 
@@ -90,8 +90,8 @@ function UseDefaultGateway({ onDone }: Readonly<{ onDone: () => void }>) {
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['me'] }),
-        // Whether the tools apps need are on the gateway changes with it.
-        queryClient.invalidateQueries({ queryKey: appToolkitsQuery.queryKey }),
+        // Whether the tools apps and scripts need are on the gateway changes with it.
+        queryClient.invalidateQueries({ queryKey: toolkitsQueryKey }),
       ])
       onDone()
     },
@@ -220,8 +220,8 @@ function GatewayPicker({
     onSuccess: async () => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['me'] }),
-        // Whether the tools apps need are on the gateway changes with it.
-        queryClient.invalidateQueries({ queryKey: appToolkitsQuery.queryKey }),
+        // Whether the tools apps and scripts need are on the gateway changes with it.
+        queryClient.invalidateQueries({ queryKey: toolkitsQueryKey }),
       ])
       onDone()
     },

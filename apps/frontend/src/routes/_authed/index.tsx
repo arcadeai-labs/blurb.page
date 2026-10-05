@@ -1,10 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import {
-  type AppToolkit,
-  AppToolkits,
-  missingTools,
-} from '@/components/app-toolkits'
+import { LoadedToolkits, missingTools } from '@/components/app-toolkits'
 import { CreateYourOwn } from '@/components/create-your-own'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -72,7 +68,7 @@ function Apps() {
                 <Badge variant="destructive">Missing tools</Badge>
               ) : null}
               <div className="ml-auto">
-                <Toolkits
+                <LoadedToolkits
                   query={toolkitsQuery}
                   toolkits={toolkitsByApp.get(app.name) ?? []}
                 />
@@ -85,28 +81,3 @@ function Apps() {
   )
 }
 
-/** An app's toolkits, once every app's have loaded. */
-function Toolkits({
-  query,
-  toolkits,
-}: Readonly<{
-  query: { isPending: boolean; error: Error | null }
-  toolkits: AppToolkit[]
-}>) {
-  if (query.isPending) {
-    return <Skeleton className="size-6" />
-  }
-
-  if (query.error) {
-    return (
-      <span
-        className="text-xs text-muted-foreground"
-        title={query.error.message}
-      >
-        Could not load tools
-      </span>
-    )
-  }
-
-  return <AppToolkits toolkits={toolkits} />
-}

@@ -1,7 +1,9 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { LoadedToolkits, missingTools } from '@/components/app-toolkits'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -17,7 +19,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
-import { scriptsQuery } from '@/lib/api'
+import { scriptsQuery, scriptToolkitsQuery } from '@/lib/api'
 
 export const Route = createFileRoute('/_authed/scripts/')({
   component: Scripts,
@@ -25,6 +27,10 @@ export const Route = createFileRoute('/_authed/scripts/')({
 
 function Scripts() {
   const scripts = useQuery(scriptsQuery)
+  const toolkitsQuery = useQuery(scriptToolkitsQuery)
+  const toolkitsByScript = new Map(
+    toolkitsQuery.data?.map((script) => [script.id, script.toolkits]),
+  )
 
   return (
     <Page
@@ -70,7 +76,7 @@ function Scripts() {
                   {script.description}
                 </CardDescription>
               </CardHeader>
-              <CardFooter className="mt-auto">
+              <CardFooter className="mt-auto gap-2">
                 <Button
                   variant="outline"
                   nativeButton={false}
@@ -78,6 +84,15 @@ function Scripts() {
                 >
                   View
                 </Button>
+                {missingTools(toolkitsByScript.get(script.id) ?? []) ? (
+                  <Badge variant="destructive">Missing tools</Badge>
+                ) : null}
+                <div className="ml-auto">
+                  <LoadedToolkits
+                    query={toolkitsQuery}
+                    toolkits={toolkitsByScript.get(script.id) ?? []}
+                  />
+                </div>
               </CardFooter>
             </Card>
           ))}

@@ -129,9 +129,15 @@ export async function clearGateway() {
   }
 }
 
+/**
+ * Prefix of the toolkit queries, which change with the user's gateway (whether
+ * it has each tool).
+ */
+export const toolkitsQueryKey = ['toolkits']
+
 /** The toolkits and MCP servers each app's scripts call tools from. */
 export const appToolkitsQuery = queryOptions({
-  queryKey: ['app-toolkits'],
+  queryKey: [...toolkitsQueryKey, 'apps'],
   queryFn: async () => {
     const response = await api.apps.toolkits.$get()
 
@@ -175,3 +181,19 @@ export const scriptQuery = (id: string) =>
       return response.json()
     },
   })
+
+/** The toolkits and MCP servers each script calls tools from. */
+export const scriptToolkitsQuery = queryOptions({
+  queryKey: [...toolkitsQueryKey, 'scripts'],
+  queryFn: async () => {
+    const response = await api.scripts.toolkits.$get()
+
+    if (!response.ok) {
+      throw new Error(
+        await errorMessage(response, "Could not load the scripts' toolkits"),
+      )
+    }
+
+    return response.json()
+  },
+})
