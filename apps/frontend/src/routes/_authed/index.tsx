@@ -5,6 +5,7 @@ import {
   AppToolkits,
   missingTools,
 } from '@/components/app-toolkits'
+import { CreateYourOwn } from '@/components/create-your-own'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
@@ -16,12 +17,6 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card'
-import {
-  Empty,
-  EmptyDescription,
-  EmptyHeader,
-  EmptyTitle,
-} from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
 import { appToolkitsQuery } from '@/lib/api'
 import { listApps } from '@/lib/mcp'
@@ -39,14 +34,6 @@ function Apps() {
 
   return (
     <Page>
-      {appsQuery.isPending ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-        </div>
-      ) : null}
-
       {appsQuery.isError ? (
         <Alert variant="destructive">
           <AlertTitle>Could not load apps</AlertTitle>
@@ -54,52 +41,46 @@ function Apps() {
         </Alert>
       ) : null}
 
-      {appsQuery.data?.apps.length === 0 ? (
-        <Empty>
-          <EmptyHeader>
-            <EmptyTitle>No apps yet</EmptyTitle>
-            <EmptyDescription>
-              Add the MCP URL to your agent and ask it to build one.
-            </EmptyDescription>
-          </EmptyHeader>
-        </Empty>
-      ) : null}
-
-      {appsQuery.data?.apps.length ? (
-        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {appsQuery.data.apps.map((app) => (
-            <Card key={app.id}>
-              <CardHeader>
-                <CardTitle>{app.title}</CardTitle>
-                <CardDescription
-                  className="line-clamp-2 min-h-10"
-                  title={app.description}
-                >
-                  {app.description}
-                </CardDescription>
-              </CardHeader>
-              <CardFooter className="mt-auto gap-2">
-                <Button
-                  variant="outline"
-                  nativeButton={false}
-                  render={<Link to="/apps/$name" params={{ name: app.name }} />}
-                >
-                  Open
-                </Button>
-                {missingTools(toolkitsByApp.get(app.name) ?? []) ? (
-                  <Badge variant="destructive">Missing tools</Badge>
-                ) : null}
-                <div className="ml-auto">
-                  <Toolkits
-                    query={toolkitsQuery}
-                    toolkits={toolkitsByApp.get(app.name) ?? []}
-                  />
-                </div>
-              </CardFooter>
-            </Card>
-          ))}
-        </section>
-      ) : null}
+      <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <CreateYourOwn />
+        {appsQuery.isPending ? (
+          <>
+            <Skeleton className="h-40" />
+            <Skeleton className="h-40" />
+          </>
+        ) : null}
+        {appsQuery.data?.apps.map((app) => (
+          <Card key={app.id}>
+            <CardHeader>
+              <CardTitle>{app.title}</CardTitle>
+              <CardDescription
+                className="line-clamp-2 min-h-10"
+                title={app.description}
+              >
+                {app.description}
+              </CardDescription>
+            </CardHeader>
+            <CardFooter className="mt-auto gap-2">
+              <Button
+                variant="outline"
+                nativeButton={false}
+                render={<Link to="/apps/$name" params={{ name: app.name }} />}
+              >
+                Open
+              </Button>
+              {missingTools(toolkitsByApp.get(app.name) ?? []) ? (
+                <Badge variant="destructive">Missing tools</Badge>
+              ) : null}
+              <div className="ml-auto">
+                <Toolkits
+                  query={toolkitsQuery}
+                  toolkits={toolkitsByApp.get(app.name) ?? []}
+                />
+              </div>
+            </CardFooter>
+          </Card>
+        ))}
+      </section>
     </Page>
   )
 }

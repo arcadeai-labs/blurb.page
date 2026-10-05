@@ -4,7 +4,6 @@ import { cn } from 'cn'
 import type { ReactNode } from 'react'
 import { Blurb } from '@/components/blurb'
 import { GatewaySettings } from '@/components/gateway'
-import { McpUrl } from '@/components/mcp-url'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -97,7 +96,6 @@ export function Page({
             aria-label="Primary navigation"
             className="flex shrink-0 items-center gap-1"
           >
-            <McpUrl />
             <GatewaySettings />
             <Button
               variant="ghost"
