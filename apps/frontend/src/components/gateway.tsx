@@ -22,6 +22,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton'
 import { toast } from '@/components/ui/toast'
 import {
+  appToolkitsQuery,
   clearGateway,
   gatewaysQuery,
   meQuery,
@@ -87,7 +88,11 @@ function UseDefaultGateway({ onDone }: Readonly<{ onDone: () => void }>) {
   const useDefault = useMutation({
     mutationFn: clearGateway,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['me'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['me'] }),
+        // Whether the tools apps need are on the gateway changes with it.
+        queryClient.invalidateQueries({ queryKey: appToolkitsQuery.queryKey }),
+      ])
       onDone()
     },
     onError: (error) =>
@@ -213,7 +218,11 @@ function GatewayPicker({
   const save = useMutation({
     mutationFn: setGateway,
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['me'] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['me'] }),
+        // Whether the tools apps need are on the gateway changes with it.
+        queryClient.invalidateQueries({ queryKey: appToolkitsQuery.queryKey }),
+      ])
       onDone()
     },
   })

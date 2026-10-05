@@ -1,7 +1,13 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
+import {
+  type AppToolkit,
+  AppToolkits,
+  missingTools,
+} from '@/components/app-toolkits'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
   Card,
@@ -17,6 +23,7 @@ import {
   EmptyTitle,
 } from '@/components/ui/empty'
 import { Skeleton } from '@/components/ui/skeleton'
+import { appToolkitsQuery } from '@/lib/api'
 import { listApps } from '@/lib/mcp'
 
 export const Route = createFileRoute('/_authed/')({
@@ -25,6 +32,10 @@ export const Route = createFileRoute('/_authed/')({
 
 function Apps() {
   const appsQuery = useQuery({ queryKey: ['apps'], queryFn: listApps })
+  const toolkitsQuery = useQuery(appToolkitsQuery)
+  const toolkitsByApp = new Map(
+    toolkitsQuery.data?.map((app) => [app.name, app.toolkits]),
+  )
 
   return (
     <Page>
@@ -67,7 +78,7 @@ function Apps() {
                   {app.description}
                 </CardDescription>
               </CardHeader>
-              <CardFooter className="mt-auto">
+              <CardFooter className="mt-auto gap-2">
                 <Button
                   variant="outline"
                   nativeButton={false}
@@ -75,6 +86,15 @@ function Apps() {
                 >
                   Open
                 </Button>
+                {missingTools(toolkitsByApp.get(app.name) ?? []) ? (
+                  <Badge variant="destructive">Missing tools</Badge>
+                ) : null}
+                <div className="ml-auto">
+                  <Toolkits
+                    query={toolkitsQuery}
+                    toolkits={toolkitsByApp.get(app.name) ?? []}
+                  />
+                </div>
               </CardFooter>
             </Card>
           ))}
@@ -82,4 +102,30 @@ function Apps() {
       ) : null}
     </Page>
   )
+}
+
+/** An app's toolkits, once every app's have loaded. */
+function Toolkits({
+  query,
+  toolkits,
+}: Readonly<{
+  query: { isPending: boolean; error: Error | null }
+  toolkits: AppToolkit[]
+}>) {
+  if (query.isPending) {
+    return <Skeleton className="size-6" />
+  }
+
+  if (query.error) {
+    return (
+      <span
+        className="text-xs text-muted-foreground"
+        title={query.error.message}
+      >
+        Could not load tools
+      </span>
+    )
+  }
+
+  return <AppToolkits toolkits={toolkits} />
 }
