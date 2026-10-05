@@ -144,3 +144,34 @@ export const appToolkitsQuery = queryOptions({
     return response.json()
   },
 })
+
+/** Every script, most recently updated first. */
+export const scriptsQuery = queryOptions({
+  queryKey: ['scripts'],
+  queryFn: async () => {
+    const response = await api.scripts.$get()
+
+    if (!response.ok) {
+      throw new Error(await errorMessage(response, 'Could not load scripts'))
+    }
+
+    return response.json()
+  },
+})
+
+/** One script, with its source and schemas. */
+export const scriptQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['scripts', id],
+    queryFn: async () => {
+      const response = await api.scripts[':id'].$get({ param: { id } })
+
+      if (!response.ok) {
+        throw new Error(
+          await errorMessage(response, 'Could not load the script'),
+        )
+      }
+
+      return response.json()
+    },
+  })
