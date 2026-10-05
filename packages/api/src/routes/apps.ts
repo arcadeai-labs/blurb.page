@@ -1,15 +1,10 @@
 import { createRoute, OpenAPIHono, z } from '@hono/zod-openapi'
 
 import type { AuthEnv } from '../auth/routes'
-import {
-  listAllTools,
-  McpUnavailableError,
-  toFunctionName,
-  withMcpClient,
-} from '../mcp'
-import { appToolkits } from '../toolkits'
+import { appToolkits, gatewayTools } from '../toolkits'
 
-const appToolkitSchema = z
+/** A toolkit or MCP server, with the tools an app or script calls from it. */
+export const appToolkitSchema = z
   .object({
     name: z.string().openapi({ example: 'Gmail' }),
     label: z.string().openapi({ example: 'Gmail' }),
@@ -52,19 +47,6 @@ const listToolkitsRoute = createRoute({
     },
   },
 })
-
-/** Function names of the tools on the user's gateway, or `null` if it's unreachable. */
-async function gatewayTools(connection: Parameters<typeof withMcpClient>[0]) {
-  try {
-    const tools = await withMcpClient(connection, listAllTools)
-    return new Set(tools.map((tool) => toFunctionName(tool.name)))
-  } catch (error) {
-    if (error instanceof McpUnavailableError) {
-      return null
-    }
-    throw error
-  }
-}
 
 export const appsRoutes = new OpenAPIHono<AuthEnv>().openapi(
   listToolkitsRoute,

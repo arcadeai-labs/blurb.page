@@ -9,6 +9,8 @@ import { executeScript } from '../execute'
 import { McpUnavailableError } from '../mcp'
 import { scriptErrorSchema } from '../script-error'
 import { scriptFields } from '../script-fields'
+import { gatewayTools, scriptToolkits } from '../toolkits'
+import { appToolkitSchema } from './apps'
 
 const scriptSchema = z
   .object({
@@ -73,6 +75,18 @@ const listRoute = createRoute({
   path: '/',
   summary: 'List scripts',
   responses: { 200: json(z.array(scriptSchema), 'All scripts') },
+})
+
+const listToolkitsRoute = createRoute({
+  method: 'get',
+  path: '/toolkits',
+  summary: 'List the toolkits and MCP servers each script needs',
+  responses: {
+    200: json(
+      z.array(z.object({ id: z.uuid(), toolkits: z.array(appToolkitSchema) })),
+      "Every script's toolkits, with the tools it calls from each",
+    ),
+  },
 })
 
 const createScriptRoute = createRoute({
@@ -153,6 +167,13 @@ export const scriptsRoutes = new OpenAPIHono<AuthEnv>()
 
     return c.json(rows.map(toJson), 200)
   })
+  // Before `/{id}`, which would otherwise take `toolkits` as an ID.
+  .openapi(listToolkitsRoute, async (c) =>
+    c.json(
+      await scriptToolkits(await gatewayTools(await c.var.mcpConnection())),
+      200,
+    ),
+  )
   .openapi(createScriptRoute, async (c) => {
     try {
       const [script] = await getDb()

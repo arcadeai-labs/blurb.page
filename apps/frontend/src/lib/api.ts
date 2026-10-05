@@ -129,15 +129,68 @@ export async function clearGateway() {
   }
 }
 
+/**
+ * Prefix of the toolkit queries, which change with the user's gateway (whether
+ * it has each tool).
+ */
+export const toolkitsQueryKey = ['toolkits']
+
 /** The toolkits and MCP servers each app's scripts call tools from. */
 export const appToolkitsQuery = queryOptions({
-  queryKey: ['app-toolkits'],
+  queryKey: [...toolkitsQueryKey, 'apps'],
   queryFn: async () => {
     const response = await api.apps.toolkits.$get()
 
     if (!response.ok) {
       throw new Error(
         await errorMessage(response, "Could not load the apps' toolkits"),
+      )
+    }
+
+    return response.json()
+  },
+})
+
+/** Every script, most recently updated first. */
+export const scriptsQuery = queryOptions({
+  queryKey: ['scripts'],
+  queryFn: async () => {
+    const response = await api.scripts.$get()
+
+    if (!response.ok) {
+      throw new Error(await errorMessage(response, 'Could not load scripts'))
+    }
+
+    return response.json()
+  },
+})
+
+/** One script, with its source and schemas. */
+export const scriptQuery = (id: string) =>
+  queryOptions({
+    queryKey: ['scripts', id],
+    queryFn: async () => {
+      const response = await api.scripts[':id'].$get({ param: { id } })
+
+      if (!response.ok) {
+        throw new Error(
+          await errorMessage(response, 'Could not load the script'),
+        )
+      }
+
+      return response.json()
+    },
+  })
+
+/** The toolkits and MCP servers each script calls tools from. */
+export const scriptToolkitsQuery = queryOptions({
+  queryKey: [...toolkitsQueryKey, 'scripts'],
+  queryFn: async () => {
+    const response = await api.scripts.toolkits.$get()
+
+    if (!response.ok) {
+      throw new Error(
+        await errorMessage(response, "Could not load the scripts' toolkits"),
       )
     }
 

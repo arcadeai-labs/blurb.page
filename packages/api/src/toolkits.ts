@@ -1,10 +1,16 @@
-// The toolkits and MCP servers each app needs on the user's gateway: the
-// tools its scripts call, grouped by the toolkit (or custom MCP server) they
+// The toolkits and MCP servers each app (and script) needs on the user's
+// gateway: the tools its scripts call, grouped by the toolkit (or custom MCP server) they
 // belong to, with Arcade's icon for it.
 import { z } from 'zod'
 
 import { getDb } from './db'
 import { apps, scripts } from './db/schema'
+import {
+  listAllTools,
+  McpUnavailableError,
+  toFunctionName,
+  withMcpClient,
+} from './mcp'
 import { referencedScripts } from './ui/validate'
 
 /**
@@ -101,6 +107,50 @@ export type AppToolkit = {
   }[]
 }
 
+/** Arcade's catalog by lowercased toolkit ID and label. */
+async function catalogByName() {
+  // Matched like the dashboard does: case-insensitively, by ID or label.
+  const byName = new Map<string, ToolkitMetadata>()
+  for (const toolkit of await toolkitMetadata()) {
+    byName.set(toolkit.id.toLowerCase(), toolkit)
+    byName.set(toolkit.label.toLowerCase(), toolkit)
+  }
+  return byName
+}
+
+/** Groups tool function names by the toolkit (or MCP server) they belong to. */
+function groupByToolkit(
+  functionNames: Iterable<string>,
+  catalog: Map<string, ToolkitMetadata>,
+  gatewayTools: Set<string> | null,
+) {
+  const toolkits = new Map<string, AppToolkit>()
+  for (const functionName of [...new Set(functionNames)].sort()) {
+    const { toolkit: name, tool } = splitFunctionName(functionName)
+    let toolkit = toolkits.get(name)
+
+    if (!toolkit) {
+      const metadata = catalog.get(name.toLowerCase())
+      toolkit = {
+        name,
+        label: metadata?.label ?? name,
+        iconUrl: metadata?.publicIconUrl ?? null,
+        source: metadata ? 'arcade' : 'mcp',
+        tools: [],
+      }
+      toolkits.set(name, toolkit)
+    }
+
+    toolkit.tools.push({
+      name: tool,
+      functionName,
+      available: gatewayTools ? gatewayTools.has(functionName) : null,
+    })
+  }
+
+  return [...toolkits.values()]
+}
+
 /**
  * The toolkits every app's scripts call tools of. `gatewayTools` holds the
  * function names of the tools on the user's gateway, or `null` if unknown.
@@ -111,51 +161,49 @@ export async function appToolkits(gatewayTools: Set<string> | null) {
     getDb()
       .select({ name: scripts.name, source: scripts.source })
       .from(scripts),
-    toolkitMetadata(),
+    catalogByName(),
   ])
 
   const toolsByScript = new Map(
     scriptRows.map((script) => [script.name, calledTools(script.source)]),
   )
-  // Matched like the dashboard does: case-insensitively, by ID or label.
-  const catalogByName = new Map<string, ToolkitMetadata>()
-  for (const toolkit of catalog) {
-    catalogByName.set(toolkit.id.toLowerCase(), toolkit)
-    catalogByName.set(toolkit.label.toLowerCase(), toolkit)
+
+  return appRows.map((app) => ({
+    name: app.name,
+    toolkits: groupByToolkit(
+      [...referencedScripts(app)].flatMap((script) => [
+        ...(toolsByScript.get(script) ?? []),
+      ]),
+      catalog,
+      gatewayTools,
+    ),
+  }))
+}
+
+/** The toolkits each script calls tools of; `gatewayTools` as for apps. */
+export async function scriptToolkits(gatewayTools: Set<string> | null) {
+  const [scriptRows, catalog] = await Promise.all([
+    getDb().select({ id: scripts.id, source: scripts.source }).from(scripts),
+    catalogByName(),
+  ])
+
+  return scriptRows.map((script) => ({
+    id: script.id,
+    toolkits: groupByToolkit(calledTools(script.source), catalog, gatewayTools),
+  }))
+}
+
+/** Function names of the tools on the user's gateway, or `null` if it's unreachable. */
+export async function gatewayTools(
+  connection: Parameters<typeof withMcpClient>[0],
+) {
+  try {
+    const tools = await withMcpClient(connection, listAllTools)
+    return new Set(tools.map((tool) => toFunctionName(tool.name)))
+  } catch (error) {
+    if (error instanceof McpUnavailableError) {
+      return null
+    }
+    throw error
   }
-
-  return appRows.map((app) => {
-    const functionNames = new Set<string>()
-    for (const script of referencedScripts(app)) {
-      for (const name of toolsByScript.get(script) ?? []) {
-        functionNames.add(name)
-      }
-    }
-
-    const toolkits = new Map<string, AppToolkit>()
-    for (const functionName of [...functionNames].sort()) {
-      const { toolkit: name, tool } = splitFunctionName(functionName)
-      let toolkit = toolkits.get(name)
-
-      if (!toolkit) {
-        const metadata = catalogByName.get(name.toLowerCase())
-        toolkit = {
-          name,
-          label: metadata?.label ?? name,
-          iconUrl: metadata?.publicIconUrl ?? null,
-          source: metadata ? 'arcade' : 'mcp',
-          tools: [],
-        }
-        toolkits.set(name, toolkit)
-      }
-
-      toolkit.tools.push({
-        name: tool,
-        functionName,
-        available: gatewayTools ? gatewayTools.has(functionName) : null,
-      })
-    }
-
-    return { name: app.name, toolkits: [...toolkits.values()] }
-  })
 }
