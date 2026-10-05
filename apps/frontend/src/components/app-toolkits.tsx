@@ -30,7 +30,8 @@ export function missingTools(toolkits: AppToolkit[]) {
   )
 }
 
-function ToolkitIcon({ toolkit }: Readonly<{ toolkit: AppToolkit }>) {
+/** A toolkit's icon, or its initial; goes inside an Avatar. */
+export function ToolkitIcon({ toolkit }: Readonly<{ toolkit: AppToolkit }>) {
   return (
     <>
       {toolkit.iconUrl ? <AvatarImage src={toolkit.iconUrl} alt="" /> : null}

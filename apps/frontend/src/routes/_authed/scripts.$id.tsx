@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ToolkitTools } from '@/components/app-toolkits'
+import { ToolkitIcon } from '@/components/app-toolkits'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Card, CardContent } from '@/components/ui/card'
+import { Avatar } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { scriptQuery, scriptToolkitsQuery } from '@/lib/api'
@@ -28,7 +29,7 @@ function ScriptToolkits({ id }: Readonly<{ id: string }>) {
   const toolkits = useQuery(scriptToolkitsQuery)
 
   if (toolkits.isPending) {
-    return <Skeleton className="h-24" />
+    return <Skeleton className="h-6" />
   }
 
   if (toolkits.isError) {
@@ -47,13 +48,32 @@ function ScriptToolkits({ id }: Readonly<{ id: string }>) {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-3">
       {used.map((toolkit) => (
-        <Card key={toolkit.name}>
-          <CardContent>
-            <ToolkitTools toolkit={toolkit} />
-          </CardContent>
-        </Card>
+        <div key={toolkit.name} className="flex flex-wrap items-center gap-2">
+          <Avatar size="sm">
+            <ToolkitIcon toolkit={toolkit} />
+          </Avatar>
+          <span
+            className="text-sm font-medium"
+            title={
+              toolkit.source === 'arcade' ? 'Arcade toolkit' : 'MCP server'
+            }
+          >
+            {toolkit.label}
+          </span>
+          {toolkit.tools.map((tool) =>
+            tool.available === false ? (
+              <Badge key={tool.functionName} variant="destructive">
+                {tool.name} · Not on gateway
+              </Badge>
+            ) : (
+              <Badge key={tool.functionName} variant="secondary">
+                {tool.name}
+              </Badge>
+            ),
+          )}
+        </div>
       ))}
     </div>
   )
