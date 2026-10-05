@@ -11,6 +11,7 @@ import {
 } from './auth/routes'
 import { ArcadeApiError } from './gateways'
 import { handleMcpRequest } from './mcp-server'
+import { appsRoutes } from './routes/apps'
 import { meRoutes } from './routes/me'
 import { organizationsRoutes } from './routes/organizations'
 import { scriptsRoutes } from './routes/scripts'
@@ -36,6 +37,7 @@ export const api = new OpenAPIHono<AuthEnv>()
   // Everything below needs a signed-in user.
   .use('*', requireUser)
   .route('/me', meRoutes)
+  .route('/apps', appsRoutes)
   .route('/organizations', organizationsRoutes)
   .route('/stats', statsRoutes)
   .route('/scripts', scriptsRoutes)

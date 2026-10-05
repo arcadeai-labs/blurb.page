@@ -128,3 +128,19 @@ export async function clearGateway() {
     )
   }
 }
+
+/** The toolkits and MCP servers each app's scripts call tools from. */
+export const appToolkitsQuery = queryOptions({
+  queryKey: ['app-toolkits'],
+  queryFn: async () => {
+    const response = await api.apps.toolkits.$get()
+
+    if (!response.ok) {
+      throw new Error(
+        await errorMessage(response, "Could not load the apps' toolkits"),
+      )
+    }
+
+    return response.json()
+  },
+})
