@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { createMiddleware } from 'hono/factory'
 
 import type { McpConnection } from '../mcp'
+import { span } from '../trace'
 import {
   type ArcadeProvider,
   callbackPaths,
@@ -30,8 +31,10 @@ export type AuthEnv = {
 
 /** Rejects requests without a signed-in user, and exposes the user to routes. */
 export const requireUser = createMiddleware<AuthEnv>(async (c, next) => {
-  const auth = await getAuth(c.req.raw)
-  const user = await getUser(auth, c.req.raw.headers)
+  const auth = await span('auth.instance', () => getAuth(c.req.raw))
+  const user = await span('auth.session', () =>
+    getUser(auth, c.req.raw.headers),
+  )
 
   if (!user) {
     return c.json({ error: 'Sign in with Arcade first' }, 401)

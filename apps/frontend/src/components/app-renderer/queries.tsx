@@ -32,6 +32,20 @@ export function resolveInput(input: unknown, stateModel: StateModel) {
   return input === undefined ? {} : resolvePropValue(input, { stateModel })
 }
 
+/** A query's cached result: the script's value and how long its run took. */
+type ScriptRun = { value: unknown; timing: NonNullable<QueryState['timing']> }
+
+/** Runs a script, timing it end to end as the browser sees it. */
+async function runTimed(script: string, input: unknown): Promise<ScriptRun> {
+  const started = performance.now()
+  const { value, toolMs } = await executeScript(script, input)
+
+  return {
+    value,
+    timing: { totalMs: Math.round(performance.now() - started), toolMs },
+  }
+}
+
 const idleMutation: MutationState = {
   status: 'idle',
   data: null,
@@ -50,16 +64,17 @@ export function initialAppState(spec: AppSpec, queryClient: QueryClient) {
   const queries = Object.fromEntries(
     Object.entries(spec.queries ?? {}).map(([name, query]) => {
       const key = scriptQueryKey(query.script, resolveInput(query.input, state))
-      const cached = queryClient.getQueryState(key)
+      const cached = queryClient.getQueryState<ScriptRun>(key)
       const enabled = evaluateVisibility(query.enabled, { stateModel: state })
       const initial: QueryState =
         cached?.status === 'success'
           ? {
               status: 'success',
-              data: cached.data ?? null,
+              data: cached.data?.value ?? null,
               error: null,
               authorizationUrl: null,
               isFetching: false,
+              timing: cached.data?.timing ?? null,
             }
           : {
               status: enabled ? 'pending' : 'idle',
@@ -67,6 +82,7 @@ export function initialAppState(spec: AppSpec, queryClient: QueryClient) {
               error: null,
               authorizationUrl: null,
               isFetching: enabled,
+              timing: null,
             }
 
       return [name, initial]
@@ -97,7 +113,7 @@ function QueryRunner({
 
   const result = useQuery({
     queryKey: scriptQueryKey(query.script, input),
-    queryFn: () => executeScript(query.script, input),
+    queryFn: () => runTimed(query.script, input),
     enabled,
     refetchInterval: query.refetchInterval ?? false,
     // Script failures are usually deterministic, so retry only once, and
@@ -112,7 +128,8 @@ function QueryRunner({
   // A paused query (e.g. retrying in a background tab) is still pending.
   const status: QueryState['status'] =
     !enabled && result.isPending ? 'idle' : result.status
-  const data = result.data ?? null
+  const data = result.data?.value ?? null
+  const timing = result.data?.timing ?? null
   const error = result.error?.message ?? null
   const authorizationUrl =
     result.error instanceof AuthorizationRequiredError
@@ -127,8 +144,9 @@ function QueryRunner({
       error,
       authorizationUrl,
       isFetching,
+      timing,
     } satisfies QueryState)
-  }, [store, name, status, data, error, authorizationUrl, isFetching])
+  }, [store, name, status, data, error, authorizationUrl, isFetching, timing])
 
   return null
 }

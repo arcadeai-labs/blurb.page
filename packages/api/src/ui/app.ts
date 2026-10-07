@@ -150,6 +150,11 @@ export type QueryState = {
   /** Set when the error is `AUTHORIZATION_REQUIRED`. */
   authorizationUrl: string | null
   isFetching: boolean
+  /**
+   * How long the data's run took, in ms: `totalMs` end to end as the browser
+   * saw it, `toolMs` waiting on the script's tool calls. `null` until loaded.
+   */
+  timing: { totalMs: number; toolMs: number } | null
 }
 
 /** State the renderer keeps up to date for each mutation, at `/mutations/<name>`. */

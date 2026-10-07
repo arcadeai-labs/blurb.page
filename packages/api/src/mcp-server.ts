@@ -26,8 +26,8 @@ import {
 } from './docs'
 import { executeScript } from './execute'
 import {
-  type McpConnection,
   listAllTools,
+  type McpConnection,
   McpUnavailableError,
   toFunctionName,
   withMcpClient,
@@ -36,6 +36,8 @@ import type { ScriptError } from './script-error'
 import { scriptFields, scriptName } from './script-fields'
 import { svgFields, svgName } from './svg-fields'
 import { toSvgJson, toSvgSummary } from './svgs'
+import { searchTools } from './tool-search'
+import { annotate, span } from './trace'
 import { appFields, appName } from './ui/app'
 import { docFields, docName } from './ui/doc'
 import { appGuide, docGuide } from './ui/guide'
@@ -187,12 +189,12 @@ function idOrName<
 function instructions(baseUrl: string) {
   return `Build web apps (UIs, forms, tables, charts, dashboards, slideshows) backed by integration tools.
 
-- Scripts are server-side JavaScript that call the upstream integration tools (list_script_tools) as \`await tools.<functionName>(args)\`, take a validated \`input\` and return JSON.
+- Scripts are server-side JavaScript that call the upstream integration tools (find them with search_script_tools) as \`await tools.<functionName>(args)\`, take a validated \`input\` and return JSON.
 - Apps can't generate content: no model runs inside them, so they only show and act on what the tools return and what the user enters. Write any fixed copy (slide text, labels) into the app yourself, and don't build features that auto-draft or summarize (drafted replies, summaries).
 - Apps are json-render UI specs rendered with shadcn/ui at ${baseUrl}/apps/<name>. Their buttons, forms and load hooks run scripts by name (the runScript action) and render the results.
 - SVGs are saved images (diagrams, illustrations, icons) that apps show by name with the Svg component. Create them with create_svg.
 
-Before creating or changing an app, call get_app_guide once: it documents the spec format, every component and action, and patterns for loading data, forms, tables, charts and row actions. Typical flow: list_script_tools → create_script (one per data operation; test with execute_script) → create_app → share the returned url. Use the list_/get_/update_/delete_ tools to change existing scripts and apps.
+Before creating or changing an app, call get_app_guide once: it documents the spec format, every component and action, and patterns for loading data, forms, tables, charts and row actions. Typical flow: search_script_tools → create_script (one per data operation; test with execute_script) → create_app → share the returned url. Use the list_/get_/update_/delete_ tools to change existing scripts and apps.
 
 Less is more: build only what the user asked for, with the fewest elements that do it. No headings, intro text or other filler (the navbar already shows the app's title and description), and no features nobody asked for.
 
@@ -239,10 +241,32 @@ function createMcpServer(
   )
 
   server.registerTool(
+    'search_script_tools',
+    {
+      description:
+        "Find the tools on the user's MCP gateway that fit each task, best first, with their input schemas. Scripts call them as `tools.<functionName>(args)`.",
+      inputSchema: {
+        tasks: z
+          .array(z.string().min(1))
+          .min(1)
+          .max(10)
+          .describe(
+            'One entry per distinct action, e.g. "list my recent emails", "send a Slack message"',
+          ),
+      },
+      annotations: { readOnlyHint: true },
+    },
+    ({ tasks }) =>
+      upstream(async () =>
+        ok({ results: await searchTools(await connection(), tasks) }),
+      ),
+  )
+
+  server.registerTool(
     'list_script_tools',
     {
       description:
-        "List the tools on the user's MCP gateway that scripts can call as `tools.<functionName>(args)`",
+        "List every tool on the user's MCP gateway that scripts can call as `tools.<functionName>(args)`. Slow on large gateways: prefer search_script_tools.",
       annotations: { readOnlyHint: true },
     },
     () =>
@@ -371,7 +395,7 @@ function createMcpServer(
     'execute_script',
     {
       description:
-        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the MCP gateway the user picked is available to it as `tools.<functionName>(args)`. Returns `{ value }`. If a tool needs the user to authorize it first, it fails with AUTHORIZATION_REQUIRED and a link to show the user.',
+        'Run a script (by id or name) in the sandbox with the given input, exactly as an app would. Every tool on the MCP gateway the user picked is available to it as `tools.<functionName>(args)`. Returns `{ value, toolMs }` (toolMs: time spent waiting on tool calls). If a tool needs the user to authorize it first, it fails with AUTHORIZATION_REQUIRED and a link to show the user.',
       inputSchema: {
         id: scriptId.optional(),
         name: scriptName.optional(),
@@ -389,11 +413,15 @@ function createMcpServer(
         return fail('Pass an id or a name')
       }
 
-      const [script] = await getDb().select().from(scripts).where(where)
+      const [script] = await span('db.script', () =>
+        getDb().select().from(scripts).where(where),
+      )
 
       if (!script) {
         return scriptNotFound()
       }
+
+      annotate({ script: script.name })
 
       return upstream(async () => {
         const result = await executeScript(
@@ -404,7 +432,7 @@ function createMcpServer(
         )
 
         return result.ok
-          ? ok({ value: result.value })
+          ? ok({ value: result.value, toolMs: result.toolMs })
           : scriptFailed(result.error)
       })
     },
@@ -766,6 +794,12 @@ function createMcpServer(
   return server
 }
 
+/** A JSON-RPC request's method and, for `tools/call`, the tool, for traces. */
+const rpcMessage = z.object({
+  method: z.string(),
+  params: z.object({ name: z.string().optional() }).optional(),
+})
+
 /**
  * Handles a Streamable HTTP MCP request, as the signed-in user or the user who
  * authorized the client. Stateless: every request gets a fresh server and
@@ -776,6 +810,20 @@ export async function handleMcpRequest(request: Request) {
   // stream; 405 tells clients not to hold one open.
   if (request.method === 'GET') {
     return new Response(null, { status: 405, headers: { Allow: 'POST' } })
+  }
+
+  const message = rpcMessage.safeParse(
+    await request
+      .clone()
+      .json()
+      .catch(() => null),
+  )
+
+  if (message.success) {
+    annotate({
+      rpc: message.data.method,
+      ...(message.data.params?.name && { tool: message.data.params.name }),
+    })
   }
 
   return withMcpUser(request, async (auth, userId) => {

@@ -113,7 +113,7 @@ function createHandlers({
       } satisfies MutationState)
 
       try {
-        const data = await executeScript(mutation.script, merged)
+        const { value: data } = await executeScript(mutation.script, merged)
         settle({ status: 'success', data, error: null })
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error)
@@ -145,7 +145,7 @@ function createHandlers({
       if (loadingPath) store.set(loadingPath, true)
 
       try {
-        const value = await executeScript(script, input ?? {})
+        const { value } = await executeScript(script, input ?? {})
 
         if (statePath) store.set(statePath, value)
         if (errorPath) store.set(errorPath, null)

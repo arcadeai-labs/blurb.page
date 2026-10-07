@@ -35,7 +35,13 @@ const errorSchema = z.object({ error: z.string() }).openapi('Error')
 
 const executeResultSchema = z
   .discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true), value: z.unknown() }),
+    z.object({
+      ok: z.literal(true),
+      value: z.unknown(),
+      toolMs: z
+        .number()
+        .describe('How long the run spent waiting on tool calls, in ms'),
+    }),
     z.object({ ok: z.literal(false), error: scriptErrorSchema }),
   ])
   .openapi('ExecuteResult')
