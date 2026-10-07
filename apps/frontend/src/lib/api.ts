@@ -129,11 +129,28 @@ export async function clearGateway() {
   }
 }
 
-/**
- * Prefix of the toolkit queries, which change with the user's gateway (whether
- * it has each tool).
- */
+/** Prefix of the toolkit queries. */
 export const toolkitsQueryKey = ['toolkits']
+
+/**
+ * Function names of the tools on the user's gateway, or `null` when it
+ * couldn't be reached. Changes with the user's gateway.
+ */
+export const gatewayToolsQuery = queryOptions({
+  queryKey: ['gateway-tools'],
+  queryFn: async () => {
+    const response = await api.tools.names.$get()
+
+    if (!response.ok) {
+      throw new Error(
+        await errorMessage(response, "Could not list the gateway's tools"),
+      )
+    }
+
+    const { functionNames } = await response.json()
+    return functionNames ? new Set(functionNames) : null
+  },
+})
 
 /** The toolkits and MCP servers each app's scripts call tools from. */
 export const appToolkitsQuery = queryOptions({

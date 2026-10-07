@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute, Link } from '@tanstack/react-router'
-import { LoadedToolkits, missingTools } from '@/components/app-toolkits'
+import {
+  LoadedToolkits,
+  missingTools,
+  useGatewayTools,
+} from '@/components/app-toolkits'
 import { CreateYourOwn } from '@/components/create-your-own'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
@@ -24,6 +28,7 @@ export const Route = createFileRoute('/_authed/')({
 function Apps() {
   const appsQuery = useQuery({ queryKey: ['apps'], queryFn: listApps })
   const toolkitsQuery = useQuery(appToolkitsQuery)
+  const gatewayTools = useGatewayTools()
   const toolkitsByApp = new Map(
     toolkitsQuery.data?.map((app) => [app.name, app.toolkits]),
   )
@@ -64,7 +69,7 @@ function Apps() {
               >
                 Open
               </Button>
-              {missingTools(toolkitsByApp.get(app.name) ?? []) ? (
+              {missingTools(toolkitsByApp.get(app.name) ?? [], gatewayTools) ? (
                 <Badge variant="destructive">Missing tools</Badge>
               ) : null}
               <div className="ml-auto">

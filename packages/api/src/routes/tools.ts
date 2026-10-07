@@ -7,6 +7,7 @@ import {
   toFunctionName,
   withMcpClient,
 } from '../mcp'
+import { gatewayTools } from '../toolkits'
 
 const toolSchema = z
   .object({
@@ -38,9 +39,43 @@ const listToolsRoute = createRoute({
   },
 })
 
-export const toolsRoutes = new OpenAPIHono<AuthEnv>().openapi(
-  listToolsRoute,
-  async (c) => {
+const listToolNamesRoute = createRoute({
+  method: 'get',
+  path: '/names',
+  summary: 'List the function names of the MCP tools available to scripts',
+  description:
+    "Just the names, kept for a couple of minutes: what the UI checks apps' and scripts' tools against.",
+  responses: {
+    200: {
+      description:
+        "Function names of the tools on the user's MCP gateway; null when it couldn't be reached",
+      content: {
+        'application/json': {
+          schema: z.object({
+            functionNames: z
+              .array(z.string())
+              .nullable()
+              .openapi({ example: ['Gmail_ListEmails'] }),
+          }),
+        },
+      },
+    },
+  },
+})
+
+export const toolsRoutes = new OpenAPIHono<AuthEnv>()
+  .openapi(listToolNamesRoute, async (c) =>
+    c.json(
+      {
+        functionNames: await gatewayTools(
+          c.var.user.id,
+          await c.var.mcpConnection(),
+        ),
+      },
+      200,
+    ),
+  )
+  .openapi(listToolsRoute, async (c) => {
     try {
       const tools = await withMcpClient(
         await c.var.mcpConnection(),
@@ -62,5 +97,4 @@ export const toolsRoutes = new OpenAPIHono<AuthEnv>().openapi(
       }
       throw error
     }
-  },
-)
+  })

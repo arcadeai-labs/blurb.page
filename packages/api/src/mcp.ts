@@ -39,15 +39,23 @@ export async function withMcpClient<T>(
   { toolRecommendation = false }: { toolRecommendation?: boolean } = {},
 ): Promise<T> {
   const client = new Client({ name: 'template-api', version: '0.0.0' })
+  const transport = new StreamableHTTPClientTransport(
+    gatewayUrl(url, toolRecommendation),
+    { requestInit: { headers: { Authorization: `Bearer ${accessToken}` } } },
+  )
 
   try {
-    await span('gateway.connect', () =>
-      client.connect(
-        new StreamableHTTPClientTransport(gatewayUrl(url, toolRecommendation), {
-          requestInit: { headers: { Authorization: `Bearer ${accessToken}` } },
-        }),
-      ),
-    )
+    await span('gateway.connect', async () => {
+      await client.connect(transport)
+      // Whether there's a session to reuse between runs, and what serves it.
+      // The session ID itself is a credential, so it isn't recorded.
+      const server = client.getServerVersion()
+      annotate({
+        session: transport.sessionId ? 'issued' : 'none',
+        protocol: transport.protocolVersion ?? 'unknown',
+        server: server ? `${server.name}@${server.version}` : 'unknown',
+      })
+    })
   } catch (error) {
     throw new McpUnavailableError(
       `Could not connect to the MCP gateway at ${url}: ${error instanceof Error ? error.message : error}`,

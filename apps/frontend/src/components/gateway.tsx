@@ -24,11 +24,11 @@ import { toast } from '@/components/ui/toast'
 import {
   clearGateway,
   gatewaysQuery,
+  gatewayToolsQuery,
   meQuery,
   organizationsQuery,
   projectsQuery,
   setGateway,
-  toolkitsQueryKey,
 } from '@/lib/api'
 import { connectArcadeAccount } from '@/lib/auth-client'
 
@@ -91,7 +91,7 @@ function UseDefaultGateway({ onDone }: Readonly<{ onDone: () => void }>) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['me'] }),
         // Whether the tools apps and scripts need are on the gateway changes with it.
-        queryClient.invalidateQueries({ queryKey: toolkitsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: gatewayToolsQuery.queryKey }),
       ])
       onDone()
     },
@@ -221,7 +221,7 @@ function GatewayPicker({
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['me'] }),
         // Whether the tools apps and scripts need are on the gateway changes with it.
-        queryClient.invalidateQueries({ queryKey: toolkitsQueryKey }),
+        queryClient.invalidateQueries({ queryKey: gatewayToolsQuery.queryKey }),
       ])
       onDone()
     },

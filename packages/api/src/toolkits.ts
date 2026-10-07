@@ -1,12 +1,14 @@
 // The toolkits and MCP servers each app (and script) needs on the user's
 // gateway: the tools its scripts call, grouped by the toolkit (or custom MCP server) they
-// belong to, with Arcade's icon for it.
+// belong to, with Arcade's icon for it. Which of those tools the gateway has
+// comes separately (`gatewayTools`), since listing a large gateway takes seconds.
 import { z } from 'zod'
 
 import { getDb } from './db'
 import { apps, scripts } from './db/schema'
 import {
   listAllTools,
+  type McpConnection,
   McpUnavailableError,
   toFunctionName,
   withMcpClient,
@@ -99,12 +101,7 @@ export type AppToolkit = {
   iconUrl: string | null
   /** In Arcade's catalog, or else a custom MCP server. */
   source: 'arcade' | 'mcp'
-  tools: {
-    name: string
-    functionName: string
-    /** On the user's gateway; `null` when it couldn't be listed. */
-    available: boolean | null
-  }[]
+  tools: { name: string; functionName: string }[]
 }
 
 /** Arcade's catalog by lowercased toolkit ID and label. */
@@ -122,7 +119,6 @@ async function catalogByName() {
 function groupByToolkit(
   functionNames: Iterable<string>,
   catalog: Map<string, ToolkitMetadata>,
-  gatewayTools: Set<string> | null,
 ) {
   const toolkits = new Map<string, AppToolkit>()
   for (const functionName of [...new Set(functionNames)].sort()) {
@@ -141,21 +137,14 @@ function groupByToolkit(
       toolkits.set(name, toolkit)
     }
 
-    toolkit.tools.push({
-      name: tool,
-      functionName,
-      available: gatewayTools ? gatewayTools.has(functionName) : null,
-    })
+    toolkit.tools.push({ name: tool, functionName })
   }
 
   return [...toolkits.values()]
 }
 
-/**
- * The toolkits every app's scripts call tools of. `gatewayTools` holds the
- * function names of the tools on the user's gateway, or `null` if unknown.
- */
-export async function appToolkits(gatewayTools: Set<string> | null) {
+/** The toolkits every app's scripts call tools of. */
+export async function appToolkits() {
   const [appRows, scriptRows, catalog] = await Promise.all([
     getDb().select().from(apps),
     getDb()
@@ -175,13 +164,12 @@ export async function appToolkits(gatewayTools: Set<string> | null) {
         ...(toolsByScript.get(script) ?? []),
       ]),
       catalog,
-      gatewayTools,
     ),
   }))
 }
 
-/** The toolkits each script calls tools of; `gatewayTools` as for apps. */
-export async function scriptToolkits(gatewayTools: Set<string> | null) {
+/** The toolkits each script calls tools of. */
+export async function scriptToolkits() {
   const [scriptRows, catalog] = await Promise.all([
     getDb().select({ id: scripts.id, source: scripts.source }).from(scripts),
     catalogByName(),
@@ -189,21 +177,51 @@ export async function scriptToolkits(gatewayTools: Set<string> | null) {
 
   return scriptRows.map((script) => ({
     id: script.id,
-    toolkits: groupByToolkit(calledTools(script.source), catalog, gatewayTools),
+    toolkits: groupByToolkit(calledTools(script.source), catalog),
   }))
 }
 
-/** Function names of the tools on the user's gateway, or `null` if it's unreachable. */
-export async function gatewayTools(
-  connection: Parameters<typeof withMcpClient>[0],
-) {
-  try {
-    const tools = await withMcpClient(connection, listAllTools)
-    return new Set(tools.map((tool) => toFunctionName(tool.name)))
-  } catch (error) {
-    if (error instanceof McpUnavailableError) {
-      return null
+const gatewayToolsMaxAgeMs = 2 * 60 * 1000
+
+/** Each user's gateway tools, by user ID and gateway URL. */
+const gatewayToolsCache = new Map<
+  string,
+  { fetchedAt: number; functionNames: Promise<string[] | null> }
+>()
+
+/**
+ * Function names of the tools on the user's gateway, or `null` if it's
+ * unreachable. Listing a large gateway takes seconds (a request per 100
+ * tools), so the list is kept for a couple of minutes per user and gateway;
+ * switching gateways changes the URL, so it doesn't serve the old one's.
+ */
+export function gatewayTools(userId: string, connection: McpConnection) {
+  const key = `${userId} ${connection.url}`
+  const now = Date.now()
+
+  for (const [cachedKey, cached] of gatewayToolsCache) {
+    if (now - cached.fetchedAt > gatewayToolsMaxAgeMs) {
+      gatewayToolsCache.delete(cachedKey)
     }
-    throw error
   }
+
+  const cached = gatewayToolsCache.get(key)
+  if (cached) {
+    return cached.functionNames
+  }
+
+  const functionNames = withMcpClient(connection, listAllTools).then(
+    (tools) => tools.map((tool) => toFunctionName(tool.name)),
+    (error: unknown) => {
+      // Failures aren't kept, so the next request tries again.
+      gatewayToolsCache.delete(key)
+      if (error instanceof McpUnavailableError) {
+        return null
+      }
+      throw error
+    },
+  )
+
+  gatewayToolsCache.set(key, { fetchedAt: now, functionNames })
+  return functionNames
 }
