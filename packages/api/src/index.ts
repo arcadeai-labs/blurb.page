@@ -18,6 +18,7 @@ import { scriptsRoutes } from './routes/scripts'
 import { statsRoutes } from './routes/stats'
 import { svgsRoutes } from './routes/svgs'
 import { toolsRoutes } from './routes/tools'
+import { traceRequests } from './trace'
 
 /** Path the API is mounted at by `apps/frontend`. */
 export const apiBasePath = '/api'
@@ -71,6 +72,7 @@ export const mcpPath = '/mcp'
  * discovery documents MCP clients find it through.
  */
 export const app = new OpenAPIHono()
+  .use('*', traceRequests)
   .route(apiBasePath, api)
   .route('/', wellKnownRoutes)
   .use(

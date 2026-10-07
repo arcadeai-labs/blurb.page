@@ -9,6 +9,7 @@ import { getDb } from '../db'
 import * as schema from '../db/schema'
 import { defaultGatewayUrl, userGateway } from '../gateways'
 import type { McpConnection } from '../mcp'
+import { span } from '../trace'
 import {
   type ArcadeProvider,
   arcadeClientId,
@@ -242,8 +243,8 @@ export async function mcpConnection(
   userId: string,
 ): Promise<McpConnection> {
   const [gateway, accessToken] = await Promise.all([
-    userGateway(userId),
-    arcadeAccessToken(auth, userId),
+    span('db.userGateway', () => userGateway(userId)),
+    span('auth.accessToken', () => arcadeAccessToken(auth, userId)),
   ])
 
   return { url: gateway?.url ?? defaultGatewayUrl(), accessToken }
@@ -259,10 +260,10 @@ export async function withMcpUser(
   request: Request,
   handler: (auth: Auth, userId: string) => Promise<Response>,
 ) {
-  const auth = await getAuth(request)
+  const auth = await span('auth.instance', () => getAuth(request))
   const user = request.headers.has('Authorization')
     ? null
-    : await getUser(auth, request.headers)
+    : await span('auth.session', () => getUser(auth, request.headers))
 
   if (user) {
     return handler(auth, user.id)

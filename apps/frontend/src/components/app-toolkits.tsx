@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query'
 import type { InferResponseType } from 'hono/client'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
@@ -16,17 +17,36 @@ import {
   ItemTitle,
 } from '@/components/ui/item'
 import { Skeleton } from '@/components/ui/skeleton'
-import type { api } from '@/lib/api'
+import { type api, gatewayToolsQuery } from '@/lib/api'
 
 export type AppToolkit = InferResponseType<
   typeof api.apps.toolkits.$get,
   200
 >[number]['toolkits'][number]
 
+/**
+ * Function names of the tools on the user's gateway. `null` until they've
+ * loaded, or when the gateway can't be listed: nothing shows as missing then.
+ */
+export function useGatewayTools() {
+  return useQuery(gatewayToolsQuery).data ?? null
+}
+
+/** Whether the user's gateway is known to lack the tool. */
+export function isMissing(
+  gatewayTools: Set<string> | null,
+  functionName: string,
+) {
+  return gatewayTools !== null && !gatewayTools.has(functionName)
+}
+
 /** Whether any of the toolkits' tools is missing from the user's gateway. */
-export function missingTools(toolkits: AppToolkit[]) {
+export function missingTools(
+  toolkits: AppToolkit[],
+  gatewayTools: Set<string> | null,
+) {
   return toolkits.some((toolkit) =>
-    toolkit.tools.some((tool) => tool.available === false),
+    toolkit.tools.some((tool) => isMissing(gatewayTools, tool.functionName)),
   )
 }
 
@@ -42,6 +62,8 @@ export function ToolkitIcon({ toolkit }: Readonly<{ toolkit: AppToolkit }>) {
 
 /** A toolkit or MCP server and the tools called from it. */
 export function ToolkitTools({ toolkit }: Readonly<{ toolkit: AppToolkit }>) {
+  const gatewayTools = useGatewayTools()
+
   return (
     <ItemGroup>
       <Item size="xs">
@@ -62,7 +84,7 @@ export function ToolkitTools({ toolkit }: Readonly<{ toolkit: AppToolkit }>) {
           <ItemContent>
             <ItemTitle>{tool.name}</ItemTitle>
           </ItemContent>
-          {tool.available === false ? (
+          {isMissing(gatewayTools, tool.functionName) ? (
             <ItemActions>
               <Badge variant="destructive">Not on gateway</Badge>
             </ItemActions>

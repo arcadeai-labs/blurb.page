@@ -9,7 +9,7 @@ import { executeScript } from '../execute'
 import { McpUnavailableError } from '../mcp'
 import { scriptErrorSchema } from '../script-error'
 import { scriptFields } from '../script-fields'
-import { gatewayTools, scriptToolkits } from '../toolkits'
+import { scriptToolkits } from '../toolkits'
 import { appToolkitSchema } from './apps'
 
 const scriptSchema = z
@@ -35,7 +35,13 @@ const errorSchema = z.object({ error: z.string() }).openapi('Error')
 
 const executeResultSchema = z
   .discriminatedUnion('ok', [
-    z.object({ ok: z.literal(true), value: z.unknown() }),
+    z.object({
+      ok: z.literal(true),
+      value: z.unknown(),
+      toolMs: z
+        .number()
+        .describe('How long the run spent waiting on tool calls, in ms'),
+    }),
     z.object({ ok: z.literal(false), error: scriptErrorSchema }),
   ])
   .openapi('ExecuteResult')
@@ -168,12 +174,7 @@ export const scriptsRoutes = new OpenAPIHono<AuthEnv>()
     return c.json(rows.map(toJson), 200)
   })
   // Before `/{id}`, which would otherwise take `toolkits` as an ID.
-  .openapi(listToolkitsRoute, async (c) =>
-    c.json(
-      await scriptToolkits(await gatewayTools(await c.var.mcpConnection())),
-      200,
-    ),
-  )
+  .openapi(listToolkitsRoute, async (c) => c.json(await scriptToolkits(), 200))
   .openapi(createScriptRoute, async (c) => {
     try {
       const [script] = await getDb()

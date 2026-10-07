@@ -355,7 +355,7 @@ An app should fit what it's shown in like a desktop app fits its window: its pag
 
 ## Workflow
 
-1. list_script_tools — the integration tools scripts can call (and their input schemas).
+1. search_script_tools — the integration tools that fit each task scripts need to do (and their input schemas). list_script_tools lists every one, but is slow on large gateways.
 2. create_script — one script per data operation the app needs (list, get, create, update, delete, aggregate for a chart…). Test each with execute_script before wiring it into a UI.
 3. create_app — the spec: its elements, plus the queries that load data and the mutations that change it. The response has the app URL. It is rejected with a list of errors if anything is invalid; fix them and retry.
 4. Iterate with get_app / update_app (send the whole spec) / delete_app, and list_apps / list_scripts / list_svgs to see what exists.
@@ -367,7 +367,7 @@ Images (diagrams, illustrations, icons) are SVGs saved with create_svg and shown
 A script's source is the body of an async JavaScript function, run in a sandbox (QuickJS; 60s timeout; no network, filesystem or npm — only the host functions below).
 
 - \`input\` is a global holding the call's input, validated against the script's inputSchema first.
-- Every integration tool is \`await tools.<functionName>(args)\` (functionName from list_script_tools). Tool results come back as structured JSON when available, otherwise parsed JSON text, otherwise a string. A tool error throws.
+- Every integration tool is \`await tools.<functionName>(args)\` (functionName from search_script_tools). Tool results come back as structured JSON when available, otherwise parsed JSON text, otherwise a string. A tool error throws. Always call them as \`tools.<functionName>(...)\`: a script that uses \`tools\` any other way (\`tools[name]\`, destructuring, the word in a comment) waits seconds for the gateway's full tool list on every run.
 - When the user hasn't authorized an integration yet, its tools throw and the run fails with AUTHORIZATION_REQUIRED and an authorizationUrl. Apps prompt the user to authorize and then retry, so let that error propagate: don't catch it or return a fallback value. When execute_script returns it, show the user the link and retry once they've authorized.
 - \`return\` the output. It must be JSON-serializable; outputSchema documents its shape.
 - Shape the output for the UI: flat arrays of objects with an \`id\` for tables and lists, pre-aggregated arrays for charts (e.g. [{ "month": "Jan", "revenue": 10 }]), plain objects for metrics. Do formatting and joins in the script, not the spec.
@@ -418,7 +418,7 @@ Apps run scripts through named queries (data the app reads) and mutations (chang
 
 Queries:
 - Run when the app opens, and again whenever a { "$state": "/path" } in their input changes. There is no need to reload them by hand.
-- Their state is at /queries/<name>: { status: "pending" | "success" | "error" | "idle", data, error, isFetching }.
+- Their state is at /queries/<name>: { status: "pending" | "success" | "error" | "idle", data, error, isFetching, timing }. timing is { totalMs, toolMs } for the run that loaded data: end to end, and the part spent waiting on tool calls.
 - Read the result with { "$state": "/queries/<name>/data" } (or a path inside it), repeat over it, or pass it to DataTable, Chart or Metric.
 - Anything that reads /queries/<name>/data must be inside a Query element for that query: { "type": "Query", "props": { "query": "<name>" }, "children": [...] }. It shows a skeleton while loading, an error with a retry button on failure (with an Authorize button when an integration needs authorization), and renders its children once data is in. Put a Query around each section that needs the data.
 - "enabled": a condition (same syntax as visible) that must hold for the query to run, e.g. { "$state": "/selected" } for a detail query. While disabled the status is "idle" and the Query element renders nothing.

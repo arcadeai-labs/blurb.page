@@ -1,6 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { createFileRoute } from '@tanstack/react-router'
-import { ToolkitIcon } from '@/components/app-toolkits'
+import {
+  isMissing,
+  ToolkitIcon,
+  useGatewayTools,
+} from '@/components/app-toolkits'
 import { Page } from '@/components/page'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Avatar } from '@/components/ui/avatar'
@@ -27,6 +31,7 @@ function Code({ children }: Readonly<{ children: string }>) {
  */
 function ScriptToolkits({ id }: Readonly<{ id: string }>) {
   const toolkits = useQuery(scriptToolkitsQuery)
+  const gatewayTools = useGatewayTools()
 
   if (toolkits.isPending) {
     return <Skeleton className="h-6" />
@@ -63,7 +68,7 @@ function ScriptToolkits({ id }: Readonly<{ id: string }>) {
             {toolkit.label}
           </span>
           {toolkit.tools.map((tool) =>
-            tool.available === false ? (
+            isMissing(gatewayTools, tool.functionName) ? (
               <Badge key={tool.functionName} variant="destructive">
                 {tool.name} · Not on gateway
               </Badge>

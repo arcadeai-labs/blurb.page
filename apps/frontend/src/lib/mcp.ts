@@ -98,13 +98,13 @@ export function getSvg(name: string) {
   return callTool('get_svg', { name }, svgSchema)
 }
 
-export async function executeScript(name: string, input: unknown) {
-  const { value } = await callTool(
+/** Runs a script: its result, and how long it waited on tool calls. */
+export function executeScript(name: string, input: unknown) {
+  return callTool(
     'execute_script',
     { name, input },
-    z.object({ value: z.unknown() }),
+    z.object({ value: z.unknown(), toolMs: z.number() }),
   )
-  return value
 }
 
 export function listDocs() {

@@ -1,14 +1,45 @@
 import { createRunner, RunError } from 'run'
 import { z } from 'zod'
 
-import { type McpConnection, mcpHostFunctions, withMcpClient } from './mcp'
+import {
+  type McpConnection,
+  mcpHostFunctions,
+  referencedTools,
+  withMcpClient,
+} from './mcp'
 import { authorizationRequired, type ScriptError } from './script-error'
+import { span } from './trace'
 
 const runner = createRunner({ limits: { timeoutMs: 60_000 } })
 
+/**
+ * `toolMs` is how long at least one tool call was in flight, so concurrent
+ * calls count once. Scripts can't time themselves: the sandbox's `Date` is
+ * deterministic.
+ */
 export type ExecuteResult =
-  | { ok: true; value: unknown }
+  | { ok: true; value: unknown; toolMs: number }
   | { ok: false; error: ScriptError }
+
+/** Wall time during which at least one wrapped call was running. */
+function callClock() {
+  let running = 0
+  let since = 0
+  let ms = 0
+
+  return {
+    async time<T>(call: () => Promise<T>) {
+      if (running++ === 0) since = performance.now()
+
+      try {
+        return await call()
+      } finally {
+        if (--running === 0) ms += performance.now() - since
+      }
+    },
+    ms: () => Math.round(ms),
+  }
+}
 
 /**
  * Runs a script in the QuickJS sandbox with `input` as a global and the
@@ -38,17 +69,19 @@ export async function executeScript(
 
   return withMcpClient(connection, async (client) => {
     let authorization: { toolName: string; url: string } | undefined
+    const toolClock = callClock()
 
     try {
-      const result = await runner.run({
-        source,
-        hostFunctions: {
-          tools: await mcpHostFunctions(client, (toolName, url) => {
-            authorization ??= { toolName, url }
-          }),
+      const tools = await mcpHostFunctions(client, {
+        functionNames: referencedTools(script.source),
+        onAuthorizationRequired: (toolName, url) => {
+          authorization ??= { toolName, url }
         },
-        abortSignal,
+        wrapCall: toolClock.time,
       })
+      const result = await span('script.run', () =>
+        runner.run({ source, hostFunctions: { tools }, abortSignal }),
+      )
 
       if (result.status !== 'completed') {
         return {
@@ -61,6 +94,7 @@ export async function executeScript(
       return {
         ok: true,
         value: JSON.parse(JSON.stringify(result.value ?? null)),
+        toolMs: toolClock.ms(),
       }
     } catch (error) {
       if (!(error instanceof RunError)) {
